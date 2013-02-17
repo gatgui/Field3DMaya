@@ -34,16 +34,16 @@
 
 #if !defined(NO_TTY)
 
-const char *blue   = "\E[34m\033[1m";
-const char *red    = "\E[31m\033[1m";
-const char *yellow = "\E[33m\033[1m";
-const char *normal = "\033[0m";
+const char *tl_blue   = "\E[34m\033[1m";
+const char *tl_red    = "\E[31m\033[1m";
+const char *tl_yellow = "\E[33m\033[1m";
+const char *tl_normal = "\033[0m";
 
 #else
 
-const char *blue   = "";
-const char *red    = "";
-const char *yellow = "";
-const char *normal = "";
+const char *tl_blue   = "";
+const char *tl_red    = "";
+const char *tl_yellow = "";
+const char *tl_normal = "";
 
 #endif

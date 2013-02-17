@@ -1,4 +1,7 @@
 .build
+release
+debug
+*.dblite
 /build/*
 CMakeFiles/*
 CMakeCache.txt
