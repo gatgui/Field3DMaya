@@ -1,6 +1,6 @@
 [submodule "excons"]
 	path = excons
-	url = git://github.com:gatgui/excons.git
+	url = git://github.com/gatgui/excons.git
 [submodule "Field3D"]
 	path = Field3D
 	url = git://github.com/imageworks/Field3D.git
