@@ -32,6 +32,11 @@
 
 #include "plugin.h"
 
+#ifdef _WIN32
+__declspec(dllexport)
+#else
+__attribute__((visibility("default")))
+#endif
 MStatus initializePlugin( MObject obj )
 {
 	MFnPlugin plugin( obj, "Prime Focus London", "1.0" );
@@ -44,6 +49,11 @@ MStatus initializePlugin( MObject obj )
 	return MStatus::kSuccess;
 }
 
+#ifdef _WIN32
+__declspec(dllexport)
+#else
+__attribute__((visibility("default")))
+#endif
 MStatus uninitializePlugin( MObject obj )
 {
 	MFnPlugin plugin( obj );
