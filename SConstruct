@@ -73,7 +73,7 @@ targets = [
                 "%s/%s" % (HDF5_prefix, libdir),
                 "%s/%s" % (Field3D_prefix, "lib" if Field3D_build else libdir)],
    "libs"    : ["hdf5", "IlmThread", "Iex", "Imath", "Half", "Field3D"],
-   "custom"  : [maya.Require]}
+   "custom"  : [maya.Require, maya.Plugin]}
 ]
 
 env = excons.MakeBaseEnv()
