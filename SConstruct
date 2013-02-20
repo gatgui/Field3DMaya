@@ -37,12 +37,21 @@ targets = [
    "ext"     : maya.PluginExt(),
    "srcs"    : glob.glob("src/*.cpp"),
    "incdirs" : [OpenEXR_inc, OpenEXR_inc+"/OpenEXR", HDF5_inc, Field3D_inc],
-   "libdirs" : [OpenEXR_lib, HDF5_lib, Field3D_lib],
-   "libs"    : ["hdf5", "IlmThread", "Iex", "Imath", "Half", "Field3D"],
+   "libdirs" : [Field3D_lib],
+   "libs"    : ["Field3D"],
+   "custom"  : [maya.Require, maya.Plugin]},
+  {"name"    : "maya%s/plug-ins/exportF3d" % mayaver,
+   "alias"   : "exportF3d",
+   "type"    : "dynamicmodule",
+   "ext"     : maya.PluginExt(),
+   "srcs"    : ["Field3D/contrib/maya_plugin/exportF3d/exportF3d.cpp"],
+   "incdirs" : [OpenEXR_inc, OpenEXR_inc+"/OpenEXR", HDF5_inc, Field3D_inc],
+   "libdirs" : [Field3D_lib],
+   "libs"    : ["Field3D"],
    "custom"  : [maya.Require, maya.Plugin]}
 ]
 
 env = excons.MakeBaseEnv()
 excons.DeclareTargets(env, targets)
 
-Default(["mayaField3d"])
+Default(["mayaField3d", "exportF3d"])
