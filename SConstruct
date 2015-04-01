@@ -1,57 +1,67 @@
+import os
+import re
+import sys
+import glob
 import excons
 from excons.tools import maya
-import os, sys, glob
+from excons.tools import ilmbase
+# from excons.tools import boost
+from excons.tools import hdf5
+from excons.tools import dl
 
+defs = []
+incdirs = []
+libdirs = []
+libs = []
+customs = [maya.Require, maya.Plugin]
 
-mayaver = ARGUMENTS.get("maya-ver", None)
-if not mayaver:
-  print("=== Using maya 2011, override using maya-ver= or with-maya=")
-  mayaver = "2011"
-  ARGUMENTS["maya-ver"] = mayaver
+# Field3D configuration
+field3d_static = (excons.GetArgument("field3d-static", 0, int) != 0)
 
-if not ARGUMENTS.get("with-field3d", None):
-  Field3D_build = True
-  prefix = os.path.abspath("./Field3D/install/%s/%s/release" % (sys.platform, "m64" if excons.Build64() else "m32"))
-  Field3D_inc = "%s/include" % prefix
-  Field3D_lib = "%s/lib" % prefix
-  ARGUMENTS["with-field3d-inc"] = Field3D_inc
-  ARGUMENTS["with-field3d-lib"] = Field3D_lib
+if not excons.GetArgument("with-field3d", default=None):
+  # Build Field3D
+  excons.SetArgument("static", "1" if field3d_static else "0")
+  
+  SConscript("Field3D/SConstruct")
+  
+  prefix = os.path.abspath("./Field3D/%s/%s" % (excons.mode_dir, excons.arch_dir))
+  field3d_inc = "%s/include" % prefix
+  field3d_lib = "%s/lib" % prefix
+  
 else:
-  Field3D_inc, Field3D_lib = excons.GetDirs("field3d")
+  field3d_inc, field3d_lib = excons.GetDirs("field3d")
 
-HDF5_inc, HDF5_lib = excons.GetDirs("hdf5")
+if field3d_inc:
+  incdirs.append(field3d_inc)
 
-OpenEXR_inc, OpenEXR_lib = excons.GetDirs("openexr")
+if field3d_lib:
+  libdirs.append(field3d_lib)
 
-if Field3D_build:
-  env = Environment()
-  env.Append(CPPPATH = [HDF5_inc, OpenEXR_inc, OpenEXR_inc+"/OpenEXR"])
-  env.Append(LIBPATH = [HDF5_lib, OpenEXR_lib])
-  Export("env")
-  SConscript("Field3D/SConscript")
+libs.append("Field3D")
 
+if field3d_static:
+  defs.append("FIELD3D_STATIC")
+  # Add Field3D dependencies
+  customs.extend([hdf5.Require(hl=False),
+                  ilmbase.Require(ilmthread=False, iexmath=False),
+                  # boost.Require(libs=["system"]),
+                  dl.Require])
+
+# Maya plugin
 targets = [
-  {"name"    : "maya%s/plug-ins/field3dFluidCache" % mayaver,
-   "alias"   : "mayaField3d",
+  {"name"    : "maya%s/plug-ins/f3dTools" % maya.Version(),
+   "alias"   : "f3dTools",
    "type"    : "dynamicmodule",
    "ext"     : maya.PluginExt(),
+   "defs"    : defs,
    "srcs"    : glob.glob("src/*.cpp"),
-   "incdirs" : [OpenEXR_inc, OpenEXR_inc+"/OpenEXR", HDF5_inc, Field3D_inc],
-   "libdirs" : [Field3D_lib],
-   "libs"    : ["Field3D"],
-   "custom"  : [maya.Require, maya.Plugin]},
-  {"name"    : "maya%s/plug-ins/exportF3d" % mayaver,
-   "alias"   : "exportF3d",
-   "type"    : "dynamicmodule",
-   "ext"     : maya.PluginExt(),
-   "srcs"    : ["Field3D/contrib/maya_plugin/exportF3d/exportF3d.cpp"],
-   "incdirs" : [OpenEXR_inc, OpenEXR_inc+"/OpenEXR", HDF5_inc, Field3D_inc],
-   "libdirs" : [Field3D_lib],
-   "libs"    : ["Field3D"],
-   "custom"  : [maya.Require, maya.Plugin]}
+   "incdirs" : incdirs,
+   "libdirs" : libdirs,
+   "libs"    : libs,
+   "custom"  : customs}
 ]
 
 env = excons.MakeBaseEnv()
 excons.DeclareTargets(env, targets)
 
-Default(["mayaField3d", "exportF3d"])
+Default(["f3dTools"])

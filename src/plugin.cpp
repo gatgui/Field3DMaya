@@ -41,11 +41,14 @@ MStatus initializePlugin( MObject obj )
 {
 	MFnPlugin plugin( obj, "Prime Focus London", "1.0" );
 
-	CHECK_MSTATUS_AND_RETURN_IT( plugin.registerCacheFormat("f3d-dense-half"  , Field3dCacheFormat::DHCreator) );
-	CHECK_MSTATUS_AND_RETURN_IT( plugin.registerCacheFormat("f3d-dense-float" , Field3dCacheFormat::DFCreator) );
-	CHECK_MSTATUS_AND_RETURN_IT( plugin.registerCacheFormat("f3d-sparse-half" , Field3dCacheFormat::SHCreator) );
-	CHECK_MSTATUS_AND_RETURN_IT( plugin.registerCacheFormat("f3d-sparse-float", Field3dCacheFormat::SFCreator) );
-
+	CHECK_MSTATUS_AND_RETURN_IT( plugin.registerCacheFormat("f3d_dense_half"  , Field3dCacheFormat::DHCreator) );
+	CHECK_MSTATUS_AND_RETURN_IT( plugin.registerCacheFormat("f3d_dense_float" , Field3dCacheFormat::DFCreator) );
+	CHECK_MSTATUS_AND_RETURN_IT( plugin.registerCacheFormat("f3d_sparse_half" , Field3dCacheFormat::SHCreator) );
+	CHECK_MSTATUS_AND_RETURN_IT( plugin.registerCacheFormat("f3d_sparse_float", Field3dCacheFormat::SFCreator) );
+	CHECK_MSTATUS_AND_RETURN_IT( plugin.registerCommand("exportF3d", exportF3d::creator, exportF3d::newSyntax) );
+	
+	Field3D::initIO();
+	
 	return MStatus::kSuccess;
 }
 
@@ -58,10 +61,11 @@ MStatus uninitializePlugin( MObject obj )
 {
 	MFnPlugin plugin( obj );
 
-	CHECK_MSTATUS_AND_RETURN_IT( plugin.deregisterCacheFormat("f3d-dense-half"  ) );
-	CHECK_MSTATUS_AND_RETURN_IT( plugin.deregisterCacheFormat("f3d-dense-float" ) );
-	CHECK_MSTATUS_AND_RETURN_IT( plugin.deregisterCacheFormat("f3d-sparse-half" ) );
-	CHECK_MSTATUS_AND_RETURN_IT( plugin.deregisterCacheFormat("f3d-sparse-float") );
-
+	CHECK_MSTATUS_AND_RETURN_IT( plugin.deregisterCacheFormat("f3d_dense_half"  ) );
+	CHECK_MSTATUS_AND_RETURN_IT( plugin.deregisterCacheFormat("f3d_dense_float" ) );
+	CHECK_MSTATUS_AND_RETURN_IT( plugin.deregisterCacheFormat("f3d_sparse_half" ) );
+	CHECK_MSTATUS_AND_RETURN_IT( plugin.deregisterCacheFormat("f3d_sparse_float") );
+	CHECK_MSTATUS_AND_RETURN_IT( plugin.deregisterCommand("exportF3d") );
+	
 	return MStatus::kSuccess;
 }
