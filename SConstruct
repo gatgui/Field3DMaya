@@ -5,7 +5,7 @@ import glob
 import excons
 from excons.tools import maya
 from excons.tools import ilmbase
-# from excons.tools import boost
+from excons.tools import boost
 from excons.tools import hdf5
 from excons.tools import dl
 
@@ -13,7 +13,6 @@ defs = []
 incdirs = []
 libdirs = []
 libs = []
-customs = [maya.Require, maya.Plugin]
 
 # Field3D configuration
 field3d_static = (excons.GetArgument("field3d-static", 0, int) != 0)
@@ -41,11 +40,6 @@ libs.append("Field3D")
 
 if field3d_static:
   defs.append("FIELD3D_STATIC")
-  # Add Field3D dependencies
-  customs.extend([hdf5.Require(hl=False),
-                  ilmbase.Require(ilmthread=False, iexmath=False),
-                  # boost.Require(libs=["system"]),
-                  dl.Require])
 
 # Maya plugin
 targets = [
@@ -58,7 +52,10 @@ targets = [
    "incdirs" : incdirs,
    "libdirs" : libdirs,
    "libs"    : libs,
-   "custom"  : customs}
+   "custom"  : [hdf5.Require(hl=False),
+                ilmbase.Require(ilmthread=False, iexmath=False),
+                boost.Require(libs=["system"]),
+                maya.Require, maya.Plugin]}
 ]
 
 env = excons.MakeBaseEnv()
