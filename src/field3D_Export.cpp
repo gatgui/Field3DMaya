@@ -76,17 +76,16 @@
 
 #define ERRCHKR		\
 	if ( MS::kSuccess != stat ) {	\
-    cerr << stat.errorString(); \
+    std::cerr << stat.errorString().asChar(); \
 		return stat;	\
 	}
 
 #define ERRCHK		\
 	if ( MS::kSuccess != stat ) {	\
-    cerr << stat.errorString(); \
+    std::cerr << stat.errorString().asChar(); \
 	}
 
 
-using namespace std;
 using namespace Field3D;
 
 
@@ -288,10 +287,10 @@ MStatus exportF3d::doIt(const MArgList& args)
   
     if (m_verbose)
     {        
-      cout << "------------------------------------------------------" << endl;
-      cout << " Selected object: " << fluidFn.name() << endl;
-      cout << " Selected object type: " << selectedObject.apiTypeStr() << endl;
-      cout << endl << endl;
+      std::cout << "------------------------------------------------------" << std::endl;
+      std::cout << " Selected object: " << fluidFn.name().asChar() << std::endl;
+      std::cout << " Selected object type: " << selectedObject.apiTypeStr() << std::endl;
+      std::cout << std::endl << std::endl;
     }      
        
     MFnFluid::FluidMethod method;
@@ -744,7 +743,7 @@ void exportF3d::setF3dField(MFnFluid &fluidFn, const char *outputPath,
       return;
     }
 
-    string fieldname("maya");
+    std::string fieldname("maya");
 
     if (m_density){
         out.writeScalarLayer<float>(fieldname, "density", densityFld);
