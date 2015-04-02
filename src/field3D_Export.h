@@ -22,7 +22,9 @@ public:
 
 private:
   
+  template <typename FField, typename VField, typename MField>
   void setF3dField(MFnFluid &fluidFn, const char *outputPath, const MDagPath &dagPath);
+  
   MStatus parseArgs(const MArgList& args);
   
 private:
@@ -33,16 +35,26 @@ private:
   MSelectionList m_slist;
   int            m_start; //<-start of simulation
   int            m_end; //<-end of simulation
-  bool           m_density; //<- export densiyt as well
-  bool           m_temperature; //<- export temprature as well
-  bool           m_fuel; //<- export fuel as well
-  bool           m_color; //<- export color as well
-  bool           m_vel; //<- export velocity as well
-  bool           m_pressure; //<- export presurre as well
-  bool           m_texture; //<- export texture as well
-  bool           m_falloff; //<- export falloff as well
+  bool           m_hasDensity; //<- export densiyt as well
+  bool           m_hasTemperature; //<- export temprature as well
+  bool           m_hasFuel; //<- export fuel as well
+  bool           m_hasColor; //<- export color as well
+  bool           m_hasVelocity; //<- export velocity as well
+  bool           m_hasPressure; //<- export presurre as well
+  bool           m_hasTexture; //<- export texture as well
+  bool           m_hasFalloff; //<- export falloff as well
   int            m_numOversample; //<- oversamples the fluids but only writes out on whole frames
   bool           m_forNCache; //<- export with .xml for use with nCache node
+  bool           m_ignoreDensity;
+  bool           m_ignoreTemperature;
+  bool           m_ignoreFuel;
+  bool           m_ignoreColor;
+  bool           m_ignoreVelocity;
+  bool           m_ignorePressure;
+  bool           m_ignoreTexture;
+  bool           m_ignoreFalloff;
+  bool           m_sparse;
+  bool           m_half;
 };
 
 

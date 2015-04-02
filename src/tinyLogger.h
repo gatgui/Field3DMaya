@@ -36,38 +36,36 @@
 
 
 //----- Tiny log macros :
-extern const char *tl_blue   ;
-extern const char *tl_red    ;
-extern const char *tl_yellow ;
-extern const char *tl_normal ;
+extern const char *tl_blue;
+extern const char *tl_red;
+extern const char *tl_yellow;
+extern const char *tl_normal;
 
-#define DEBUG_MODE
-#if defined (DEBUG_MODE) && !defined(NDEBUG)
+#ifdef FIELD3D_MAYA_DEBUG
 	#define DEBUG(message) \
-		std::cout<< tl_blue << "[DEBUG] " << tl_blue <<__FILE__<<"::"<<__FUNCTION__<<"():"<<__LINE__<< tl_normal << " : "<< message << std::endl ;
+		std::cout << tl_blue << "[DEBUG] " << tl_blue << __FILE__ << "::" << __FUNCTION__ << "():" << __LINE__ << tl_normal << " : " << message << std::endl;
 
 	#define TRACE() \
-		std::cout<< tl_yellow << "[TRACE] " <<__FILE__<<"::"<<__FUNCTION__<<"():"<<__LINE__<< tl_normal << std::endl ;
+		std::cout << tl_yellow << "[TRACE] " << __FILE__ << "::" << __FUNCTION__ << "():" << __LINE__ << tl_normal << std::endl;
 
 #else
 	#define DEBUG(message)
 	#define TRACE()
 #endif
 
+#ifdef FIELD3D_MAYA_LOG
+	#define LOG(message) \
+			std::cout<< tl_yellow << "[LOG  ] " << tl_blue << __FILE__ << "::" << __FUNCTION__ << "():" << __LINE__ << tl_normal << " : " << message << std::endl;
 
-#if defined(NDEBUG)
+	#define WARNING(message) \
+			std::cout<< tl_yellow << "[WARN ] " << tl_blue << __FILE__ << "::" << __FUNCTION__ << "():" << __LINE__ << tl_normal << " : " << message << std::endl;
+
+	#define ERROR(message) \
+			std::cerr<< tl_red    << "[ERROR] " << __FILE__ << "::" << __FUNCTION__ << "():" << __LINE__<< " : " << message << std::endl;
+#else
 	#define LOG(message)
 	#define WARNING(message)
 	#define ERROR(message)
-#else
-	#define LOG(message) \
-			std::cout<< tl_yellow << "[LOG  ] " << tl_blue <<__FILE__<<"::"<<__FUNCTION__<<"():"<<__LINE__<< tl_normal << " : "<< message << std::endl ;
-
-	#define WARNING(message) \
-			std::cout<< tl_yellow << "[WARN ] " << tl_blue <<__FILE__<<"::"<<__FUNCTION__<<"():"<<__LINE__<< tl_normal << " : "<< message << std::endl ;
-
-	#define ERROR(message) \
-			std::cerr<< tl_red    << "[ERROR] " << __FILE__<<"::"<<__FUNCTION__<<"():"<<__LINE__<< " : "<< message << std::endl ;
 #endif
 
 
