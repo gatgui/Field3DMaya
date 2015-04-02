@@ -75,16 +75,16 @@
 
 #include <maya/MComputation.h>
 
-#define ERRCHKR		\
-	if ( MS::kSuccess != stat ) {	\
+#define ERRCHKR   \
+  if ( MS::kSuccess != stat ) { \
     std::cerr << stat.errorString().asChar(); \
-		return stat;	\
-	}
+    return stat;  \
+  }
 
-#define ERRCHK		\
-	if ( MS::kSuccess != stat ) {	\
+#define ERRCHK    \
+  if ( MS::kSuccess != stat ) { \
     std::cerr << stat.errorString().asChar(); \
-	}
+  }
 
 
 using namespace Field3D;
@@ -312,8 +312,8 @@ MStatus exportF3d::doIt(const MArgList& args)
   
   for (; !selListIter.isDone(); selListIter.next())
   {
-    MDagPath 	dagPath;
-    MObject 	selectedObject;
+    MDagPath  dagPath;
+    MObject   selectedObject;
     
     status = selListIter.getDependNode(selectedObject);
     status = selListIter.getDagPath(dagPath);
@@ -573,7 +573,7 @@ MStatus exportF3d::doIt(const MArgList& args)
       dt = step;
     }
 
-    computation.endComputation();	
+    computation.endComputation(); 
     
     // generate .xml for nCache compatible output
     if (m_forNCache)

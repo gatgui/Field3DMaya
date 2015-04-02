@@ -72,72 +72,72 @@ class Field3dCacheFormat : public MPxCacheFormat
 public:
 
 
-	Field3dCacheFormat(
-			Field3DTools::FieldTypeEnum type           = Field3DTools::DENSE ,
-			Field3DTools::FieldDataTypeEnum data_type  = Field3DTools::FLOAT
-	);
-	~Field3dCacheFormat();
+   Field3dCacheFormat(
+         Field3DTools::FieldTypeEnum type           = Field3DTools::DENSE ,
+         Field3DTools::FieldDataTypeEnum data_type  = Field3DTools::FLOAT
+   );
+   ~Field3dCacheFormat();
 
-	MString	extension() { return "f3d"; } ;
+   MString  extension() { return "f3d"; } ;
 
-	// specific creator : D = Dense , S = Sparse, F = float , H = half
-	static void    *DHCreator()  { return new Field3dCacheFormat(Field3DTools::DENSE  , Field3DTools::HALF)  ; };
-	static void    *DFCreator()  { return new Field3dCacheFormat(Field3DTools::DENSE  , Field3DTools::FLOAT) ; };
-	static void    *SHCreator()  { return new Field3dCacheFormat(Field3DTools::SPARSE , Field3DTools::HALF)  ; };
-	static void    *SFCreator()  { return new Field3dCacheFormat(Field3DTools::SPARSE , Field3DTools::FLOAT) ; };
+   // specific creator : D = Dense , S = Sparse, F = float , H = half
+   static void    *DHCreator()  { return new Field3dCacheFormat(Field3DTools::DENSE  , Field3DTools::HALF)  ; };
+   static void    *DFCreator()  { return new Field3dCacheFormat(Field3DTools::DENSE  , Field3DTools::FLOAT) ; };
+   static void    *SHCreator()  { return new Field3dCacheFormat(Field3DTools::SPARSE , Field3DTools::HALF)  ; };
+   static void    *SFCreator()  { return new Field3dCacheFormat(Field3DTools::SPARSE , Field3DTools::FLOAT) ; };
 
-	// general functions inherited from MPxCacheFormat
-	MStatus open    ( const MString& fileName, FileAccessMode mode);
-	void    close   ();
-	MStatus isValid ();
+   // general functions inherited from MPxCacheFormat
+   MStatus open    ( const MString& fileName, FileAccessMode mode);
+   void    close   ();
+   MStatus isValid ();
 
-	// write functions inherited from MPxCacheFormat
-	MStatus writeHeader      ( const MString& version, MTime& startTime, MTime& endTime);
-	MStatus writeFloatArray  ( const MFloatArray&   );
-	MStatus writeDoubleArray ( const MDoubleArray&  );
-	MStatus writeChannelName ( const MString & name );
-	MStatus writeTime        ( MTime& time);
-	void    beginWriteChunk  () {};
-	void    endWriteChunk    () {};
+   // write functions inherited from MPxCacheFormat
+   MStatus writeHeader      ( const MString& version, MTime& startTime, MTime& endTime);
+   MStatus writeFloatArray  ( const MFloatArray&   );
+   MStatus writeDoubleArray ( const MDoubleArray&  );
+   MStatus writeChannelName ( const MString & name );
+   MStatus writeTime        ( MTime& time);
+   void    beginWriteChunk  () {};
+   void    endWriteChunk    () {};
 
-	// read functions inherited from MPxCacheFormat
-	MStatus  readFloatArray  ( MFloatArray&  , unsigned size );
-	MStatus  readDoubleArray ( MDoubleArray& , unsigned size );
-	MStatus  findChannelName ( const MString & name);
-	MStatus  readChannelName ( MString& name);
-	unsigned readArraySize   ();
-	MStatus  readHeader      ();
-	MStatus  beginReadChunk  () {return MStatus::kSuccess;};
-	void     endReadChunk    () {};
+   // read functions inherited from MPxCacheFormat
+   MStatus  readFloatArray  ( MFloatArray&  , unsigned size );
+   MStatus  readDoubleArray ( MDoubleArray& , unsigned size );
+   MStatus  findChannelName ( const MString & name);
+   MStatus  readChannelName ( MString& name);
+   unsigned readArraySize   ();
+   MStatus  readHeader      ();
+   MStatus  beginReadChunk  () {return MStatus::kSuccess;};
+   void     endReadChunk    () {};
 
-	// timeline
-	MStatus  readTime        ( MTime& time);
-	MStatus  findTime        ( MTime& time, MTime& foundTime);
-	MStatus  readNextTime    ( MTime& foundTime);
-	MStatus  rewind();
+   // timeline
+   MStatus  readTime        ( MTime& time);
+   MStatus  findTime        ( MTime& time, MTime& foundTime);
+   MStatus  readNextTime    ( MTime& foundTime);
+   MStatus  rewind();
 
 
 private:
 
 
-	template< class T >  // T is MFloatArray or MDoubleArray
-	MStatus writeArray(T  &array);
+   template< class T >  // T is MFloatArray or MDoubleArray
+   MStatus writeArray(T  &array);
 
-	template< class T >  // T is MFloatArray or MDoubleArray
-	MStatus readArray(T &array, unsigned arraySize);
+   template< class T >  // T is MFloatArray or MDoubleArray
+   MStatus readArray(T &array, unsigned arraySize);
 
-	Field3DInputFile   *m_inFile  ;
-	Field3DOutputFile  *m_outFile ;
+   Field3DInputFile   *m_inFile  ;
+   Field3DOutputFile  *m_outFile ;
 
-	std::string  m_filename      ;
-	bool         m_isFileOpened  ;
-	MString      m_currentName   ;
-	bool         m_ReadNameStack ;
-	float        m_offset[3]     ;
+   std::string  m_filename      ;
+   bool         m_isFileOpened  ;
+   MString      m_currentName   ;
+   bool         m_ReadNameStack ;
+   float        m_offset[3]     ;
 
-	// export Type
-	Field3DTools::FieldTypeEnum     FIELD_TYPE       ;
-	Field3DTools::FieldDataTypeEnum FIELD_DATA_TYPE  ;
+   // export Type
+   Field3DTools::FieldTypeEnum     FIELD_TYPE       ;
+   Field3DTools::FieldDataTypeEnum FIELD_DATA_TYPE  ;
 
 
 };

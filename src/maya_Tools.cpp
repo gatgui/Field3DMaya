@@ -50,77 +50,77 @@ namespace MayaTools {
 
 MStatus getDagPath( string nodeName , MDagPath &dagPath , MFn::Type type = MFn::kInvalid) {
 
-	// Initialisation of the DAG traversal
-	MStatus status                      = MS::kSuccess;
-	MItDag::TraversalType traversalType = MItDag::kDepthFirst;
-	MFn::Type filterType                = type;
+  // Initialisation of the DAG traversal
+  MStatus status                      = MS::kSuccess;
+  MItDag::TraversalType traversalType = MItDag::kDepthFirst;
+  MFn::Type filterType                = type;
 
-	// Traversal start
-	MItDag dagIterator( traversalType, filterType, &status);
-	CHECK_MSTATUS_AND_RETURN_IT(status);
+  // Traversal start
+  MItDag dagIterator( traversalType, filterType, &status);
+  CHECK_MSTATUS_AND_RETURN_IT(status);
 
-	// traversal
-	for ( ; !dagIterator.isDone(); dagIterator.next() ) {
+  // traversal
+  for ( ; !dagIterator.isDone(); dagIterator.next() ) {
 
-		// DAG path
-		status = dagIterator.getPath(dagPath);
-		if( status != MS::kSuccess ) {
-			CHECK_MSTATUS(status);
-			continue;
-		}
+    // DAG path
+    status = dagIterator.getPath(dagPath);
+    if( status != MS::kSuccess ) {
+      CHECK_MSTATUS(status);
+      continue;
+    }
 
-		// DAG node corresponding to this DAG Path
-		MFnDagNode dagNode(dagPath, &status);
-		if( status != MS::kSuccess ) {
-			CHECK_MSTATUS(status);
-			continue;
-		}
+    // DAG node corresponding to this DAG Path
+    MFnDagNode dagNode(dagPath, &status);
+    if( status != MS::kSuccess ) {
+      CHECK_MSTATUS(status);
+      continue;
+    }
 
-		if( nodeName == dagNode.name().asChar() ) return MS::kSuccess;
+    if( nodeName == dagNode.name().asChar() ) return MS::kSuccess;
 
-	}
-	return MS::kNotFound;
+  }
+  return MS::kNotFound;
 }
 
 
 MStatus getTransform( string nodeName , double (&transform)[4][4] ) {
 
-	MDagPath dagPath;
-	CHECK_MSTATUS_AND_RETURN_IT( getDagPath(nodeName,dagPath) ) ;
+  MDagPath dagPath;
+  CHECK_MSTATUS_AND_RETURN_IT( getDagPath(nodeName,dagPath) ) ;
 
-	MStatus status     = MS::kSuccess;
-	MMatrix transformM = dagPath.inclusiveMatrix(&status);
+  MStatus status     = MS::kSuccess;
+  MMatrix transformM = dagPath.inclusiveMatrix(&status);
 
-	CHECK_MSTATUS_AND_RETURN_IT( status );
-	CHECK_MSTATUS_AND_RETURN_IT( transformM.get(transform) );
+  CHECK_MSTATUS_AND_RETURN_IT( status );
+  CHECK_MSTATUS_AND_RETURN_IT( transformM.get(transform) );
 
-	return MS::kSuccess;
+  return MS::kSuccess;
 }
 
 
 
 MStatus getFluidNode(string fluidName, MFnFluid &fluid) {
 
-	// get the corresponding DAG Path
-	MDagPath dagPath;
+  // get the corresponding DAG Path
+  MDagPath dagPath;
 
-	CHECK_MSTATUS_AND_RETURN_IT( getDagPath( fluidName , dagPath , MFn::kFluid) );
-	// test if the object is a fluid
-	MObject node = dagPath.node();
-	if( fluid.hasObj(node) && fluid.setObject(node) == MS::kSuccess) return MS::kSuccess;
+  CHECK_MSTATUS_AND_RETURN_IT( getDagPath( fluidName , dagPath , MFn::kFluid) );
+  // test if the object is a fluid
+  MObject node = dagPath.node();
+  if( fluid.hasObj(node) && fluid.setObject(node) == MS::kSuccess) return MS::kSuccess;
 
-	return MS::kFailure;
+  return MS::kFailure;
 
 }
 
 
 MStatus getNodeValue( MFnDependencyNode &node , const char *valueName, float &result )
 {
-	MStatus status;
-	MPlug plug = node.findPlug (valueName, &status);
-	CHECK_MSTATUS_AND_RETURN_IT( status );
-	CHECK_MSTATUS_AND_RETURN_IT( plug.getValue (result) );
-	return  MS::kSuccess;
+  MStatus status;
+  MPlug plug = node.findPlug (valueName, &status);
+  CHECK_MSTATUS_AND_RETURN_IT( status );
+  CHECK_MSTATUS_AND_RETURN_IT( plug.getValue (result) );
+  return  MS::kSuccess;
 }
 
 
