@@ -47,6 +47,18 @@ MStatus initializePlugin( MObject obj )
   CHECK_MSTATUS_AND_RETURN_IT( plugin.registerCacheFormat("f3d_sparse_float", Field3dCacheFormat::SFCreator) );
   CHECK_MSTATUS_AND_RETURN_IT( plugin.registerCommand("exportF3d", exportF3d::creator, exportF3d::newSyntax) );
   
+  MStatus status = plugin.registerNode( "Field3DForceLoad",
+                                        Field3DForceLoad::id,
+                                        &Field3DForceLoad::creator,
+                                        &Field3DForceLoad::initialize,
+                                        MPxNode::kDependNode );
+    
+  if (!status)
+  {
+    status.perror( "registerNode Field3DForceLoad failed" );
+    return status;
+  }
+  
   Field3D::initIO();
   
   return MStatus::kSuccess;
@@ -60,7 +72,15 @@ __attribute__((visibility("default")))
 MStatus uninitializePlugin( MObject obj )
 {
   MFnPlugin plugin( obj );
-
+  
+  MStatus status = plugin.deregisterNode( Field3DForceLoad::id );
+  
+  if (!status)
+  {
+    status.perror( "deregisterNode Field3DForceLoad failed" );
+    return status;
+  }
+  
   CHECK_MSTATUS_AND_RETURN_IT( plugin.deregisterCacheFormat("f3d_dense_half"  ) );
   CHECK_MSTATUS_AND_RETURN_IT( plugin.deregisterCacheFormat("f3d_dense_float" ) );
   CHECK_MSTATUS_AND_RETURN_IT( plugin.deregisterCacheFormat("f3d_sparse_half" ) );
