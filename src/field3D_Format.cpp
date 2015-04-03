@@ -95,6 +95,8 @@ Field3dCacheFormat::Field3dCacheFormat(Field3DTools::FieldTypeEnum type,
 
 Field3dCacheFormat::~Field3dCacheFormat()
 {
+  if (m_inFile) delete m_inFile;
+  if (m_outFile) delete m_outFile;
 }
 
 MStatus Field3dCacheFormat::open(const MString& fileName, FileAccessMode mode)

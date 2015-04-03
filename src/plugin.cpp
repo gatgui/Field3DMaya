@@ -59,6 +59,18 @@ MStatus initializePlugin( MObject obj )
     return status;
   }
   
+  status = plugin.registerNode( "Field3DVRayMatrix",
+                                Field3DVRayMatrix::id,
+                                &Field3DVRayMatrix::creator,
+                                &Field3DVRayMatrix::initialize,
+                                MPxNode::kDependNode );
+    
+  if (!status)
+  {
+    status.perror( "registerNode FieldVRayMatrix failed" );
+    return status;
+  }
+  
   Field3D::initIO();
   
   return MStatus::kSuccess;
@@ -73,7 +85,16 @@ MStatus uninitializePlugin( MObject obj )
 {
   MFnPlugin plugin( obj );
   
-  MStatus status = plugin.deregisterNode( Field3DForceLoad::id );
+  MStatus status = plugin.deregisterNode( Field3DVRayMatrix::id );
+  
+  if (!status)
+  {
+    status.perror( "deregisterNode Field3DVRayMatrix failed" );
+    return status;
+  }
+  
+  
+  status = plugin.deregisterNode( Field3DForceLoad::id );
   
   if (!status)
   {

@@ -1,0 +1,33 @@
+
+global proc string createVRayF3dGrid(string $filename)
+{
+    if (`pluginInfo -q -l f3dTools` == 0)
+    {
+        loadPlugin f3dTools;
+    }
+    
+    string $grid = `createNode -ss -name "VRayVolumeGridShape#" VRayVolumeGrid`;
+    string $cst = `createNode -ss Field3DVRayMatrix`;
+    
+    setAttr -type "string" ($grid+".inFile") $filename;
+    
+    string $pl[] = `listRelatives -parent $grid`;
+    
+    connectAttr ($grid+".inFile") ($cst+".filename");
+    connectAttr time1.outTime ($cst+".time");
+    
+    connectAttr ($cst+".outShear") ($pl[0]+".shear");
+    connectAttr ($cst+".outTranslate") ($pl[0]+".translate");
+    connectAttr ($cst+".outRotate") ($pl[0]+".rotate");
+    connectAttr ($cst+".outScale") ($pl[0]+".scale");
+    connectAttr ($cst+".outRotateOrder") ($pl[0]+".rotateOrder");
+    connectAttr ($cst+".outRotateAxis") ($pl[0]+".rotateAxis");
+    connectAttr ($cst+".outRotatePivot") ($pl[0]+".rotatePivot");
+    connectAttr ($cst+".outRotatePivotTranslate") ($pl[0]+".rotatePivotTranslate");
+    connectAttr ($cst+".outScalePivot") ($pl[0]+".scalePivot");
+    connectAttr ($cst+".outScalePivotTranslate") ($pl[0]+".scalePivotTranslate");
+    
+    select -r $grid;
+    
+    return $grid;
+}
