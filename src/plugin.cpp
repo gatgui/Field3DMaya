@@ -71,6 +71,14 @@ MStatus initializePlugin( MObject obj )
     return status;
   }
   
+  status = plugin.registerCommand("queryF3d", QueryF3d::creator, QueryF3d::newSyntax);
+  
+  if (!status)
+  {
+    status.perror( "registerCommand queryF3d failed" );
+    return status;
+  }
+  
   Field3D::initIO();
   
   return MStatus::kSuccess;
@@ -85,7 +93,15 @@ MStatus uninitializePlugin( MObject obj )
 {
   MFnPlugin plugin( obj );
   
-  MStatus status = plugin.deregisterNode( Field3DVRayMatrix::id );
+  MStatus status = plugin.deregisterCommand("queryF3d");
+  
+  if (!status)
+  {
+    status.perror( "deregisterCommand queryF3d failed" );
+    return status;
+  }
+  
+  status = plugin.deregisterNode( Field3DVRayMatrix::id );
   
   if (!status)
   {
