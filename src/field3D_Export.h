@@ -7,6 +7,8 @@
 #include <maya/MFnFluid.h>
 #include <maya/MDagPath.h>
 #include <maya/MSelectionList.h>
+#include <map>
+#include <string>
 
 class exportF3d : public MPxCommand
 {
@@ -26,6 +28,8 @@ private:
   void setF3dField(MFnFluid &fluidFn, const char *outputPath, const MDagPath &dagPath);
   
   MStatus parseArgs(const MArgList& args);
+  
+  const std::string& remapChannel(const std::string &name) const;
   
 private:
 
@@ -55,6 +59,7 @@ private:
   bool           m_ignoreFalloff;
   bool           m_sparse;
   bool           m_half;
+  std::map<std::string, std::string> m_remapChannels;
 };
 
 

@@ -89,6 +89,77 @@
 
 using namespace Field3D;
 
+//----------------------------------------------------------------------------//
+
+static void StripWS(std::string &s)
+{
+  size_t p = s.find_first_not_of(" \t\n");
+  
+  if (p == std::string::npos)
+  {
+    s = "";
+  }
+  else
+  {
+    if (p > 0)
+    {
+      s = s.substr(p);
+    }
+    
+    p = s.find_last_not_of(" \t\n");
+    
+    if (p == std::string::npos)
+    {
+      return;
+    }
+    else if (p + 1 < s.length())
+    {
+      s = s.substr(0, p + 1);
+    }
+  }
+}
+
+static size_t Split(const std::string &s, char sep, std::vector<std::string> &splits, bool strip=true)
+{
+  std::string split;
+  
+  splits.clear();
+  
+  size_t p0 = 0;
+  size_t p1 = s.find(sep, p0);
+  
+  while (p1 != std::string::npos)
+  {
+    split = s.substr(p0, p1 - p0);
+    
+    if (strip)
+    {
+      StripWS(split);
+    }
+    
+    if (split.length() > 0)
+    {
+      splits.push_back(split);
+    }
+    
+    p0 = p1 + 1;
+    p1 = s.find(sep, p0);
+  }
+  
+  split = s.substr(p0);
+  
+  if (strip)
+  {
+    StripWS(split);
+  }
+  
+  if (split.length() > 0)
+  {
+    splits.push_back(split);
+  }
+  
+  return splits.size();
+}
 
 //----------------------------------------------------------------------------//
 
@@ -158,6 +229,7 @@ MSyntax exportF3d::newSyntax()
   stat = syntax.addFlag("-fnc", "-forNCache", MSyntax::kNoArg); ERRCHK;
   stat = syntax.addFlag("-sp",  "-sparse", MSyntax::kBoolean); ERRCHK;
   stat = syntax.addFlag("-hf",  "-half", MSyntax::kBoolean); ERRCHK;
+  stat = syntax.addFlag("-rc",  "-remapChannels", MSyntax::kString); ERRCHK;
   
   stat = syntax.addFlag("-d", "-debug");ERRCHK; 
   syntax.addFlag("-h", "-help");
@@ -170,7 +242,6 @@ MSyntax exportF3d::newSyntax()
 
   return syntax;
 }
-
 
 MStatus exportF3d::parseArgs( const MArgList &args )
 {
@@ -191,18 +262,20 @@ MStatus exportF3d::parseArgs( const MArgList &args )
       "    -id    -ignoreDensity        Don't output 'density' field\n"
       "    -itm   -ignoreTemperature    Don't output 'temperature' field\n"
       "    -ifu   -ignoreFuel           Don't output 'fuel' field\n"
-      "    -iv    -ignoreVelocity       Don't output 'v_mac' field\n"
-      "    -ic    -ignoreColor          Don't output 'Cd' field\n"
-      "    -itx   -ignoreTexture        Don't output 'coord' field\n"
+      "    -iv    -ignoreVelocity       Don't output 'velocity' field\n"
+      "    -ic    -ignoreColor          Don't output 'color' field\n"
+      "    -itx   -ignoreTexture        Don't output 'texture' field\n"
       "    -ifa   -ignoreFalloff        Don't output 'falloff' field\n"
       "    -ap    -addPressure          Output 'pressure' field\n"
       "    -ns    -numOversample int    Oversamples the solver with N sub frame(s) but\n"
       "                                   only writes out whole frame sim data\n"
       "    -sp    -sparse       bool    Outut sparse field or not (false by default)\n"    
       "    -hf    -half         bool    Outut half float fields or not (false by default)\n"
+      "    -rc    -remapChannels string Remap fluid channels (',' separated list of oldName=newName)\n"
+      "                                   (default is 'velocity=v_mac,color=Cd,texture=coord'\n"
       "    -fnc   -forNCache            Format file and field names to be nCache compatible\n"
-      "                                   File names : <outputDir>/<outputName>Frame<frame>.f3d\n"
-      "                                   Field names: 'v_mac' -> 'velocity', 'Cd' -> 'color'\n"
+      "                                   Overrides output filename to <outputDir>/<outputName>Frame<frame>.f3d\n"
+      "                                   Note: default channel name remapping is ignored\n"
       "    -d     -debug\n"
       "    -h     -help\n"
       "Example:\n"
@@ -246,6 +319,7 @@ MStatus exportF3d::parseArgs( const MArgList &args )
   m_ignoreTexture = argData.isFlagSet("-ignoreTexture");
   m_ignoreFalloff = argData.isFlagSet("-ignoreFalloff");
   m_forNCache = argData.isFlagSet("-forNCache");
+  m_remapChannels.clear();
     
   if (argData.isFlagSet("-outputDir"))
   {
@@ -277,6 +351,46 @@ MStatus exportF3d::parseArgs( const MArgList &args )
     argData.getFlagArgument("-half", 0, m_half);
   }
   
+  if (argData.isFlagSet("-remapChannels"))
+  {
+    MString sarg;
+    
+    argData.getFlagArgument("-remapChannels", 0, sarg);
+    
+    std::string rc = sarg.asChar();
+    std::vector<std::string> items;
+    
+    Split(rc, ',', items, true);
+    
+    for (size_t i=0; i<items.size(); ++i)
+    {
+      size_t p = items[i].find('=');
+      
+      if (p != std::string::npos)
+      {
+        std::string from = items[i].substr(0, p);
+        std::string to = items[i].substr(p + 1);
+        
+        StripWS(from);
+        StripWS(to);
+        
+        if (from.length() > 0 && to.length() > 0)
+        {
+          m_remapChannels[from] = to;
+        }
+      }
+    }
+  }
+  else
+  {
+    if (!m_forNCache)
+    {
+      m_remapChannels["velocity"] = "v_mac";
+      m_remapChannels["color"] = "Cd";
+      m_remapChannels["texture"] = "coord";
+    }
+  }
+  
   status = argData.getObjects(m_slist);
   if (!status)
   {
@@ -291,6 +405,13 @@ MStatus exportF3d::parseArgs( const MArgList &args )
   }
   
   return MS::kSuccess;
+}
+
+const std::string& exportF3d::remapChannel(const std::string &name) const
+{
+  std::map<std::string, std::string>::const_iterator rit = m_remapChannels.find(name);
+  
+  return (rit == m_remapChannels.end() ? name : rit->second);
 }
 
 MStatus exportF3d::doIt(const MArgList& args)
@@ -330,6 +451,11 @@ MStatus exportF3d::doIt(const MArgList& args)
       std::cout << "------------------------------------------------------" << std::endl;
       std::cout << " Selected object: " << fluidFn.name().asChar() << std::endl;
       std::cout << " Selected object type: " << selectedObject.apiTypeStr() << std::endl;
+      std::cout << " Remap channel names: " << std::endl;
+      for (std::map<std::string, std::string>::const_iterator it = m_remapChannels.begin(); it != m_remapChannels.end(); ++it)
+      {
+        std::cout <<"   \"" << it->first << "\" => \"" << it->second << "\"" << std::endl;
+      }
       std::cout << std::endl << std::endl;
     }      
        
@@ -339,47 +465,32 @@ MStatus exportF3d::doIt(const MArgList& args)
     if (!m_ignoreDensity)
     {
       status = fluidFn.getDensityMode(method, gradient);
-      if (method != MFnFluid::kStaticGrid && method != MFnFluid::kDynamicGrid) 
-      {
-        m_ignoreDensity = true;
-      }
+      m_ignoreDensity = (status.error() || (method != MFnFluid::kStaticGrid && method != MFnFluid::kDynamicGrid));
     }
     
     if (!m_ignoreTemperature)
     {
       status = fluidFn.getTemperatureMode(method, gradient);
-      if (method != MFnFluid::kStaticGrid && method != MFnFluid::kDynamicGrid)
-      {
-        m_ignoreTemperature = true;
-      }
+      m_ignoreTemperature = (status.error() || (method != MFnFluid::kStaticGrid && method != MFnFluid::kDynamicGrid));
     }
     
     if (!m_ignoreFuel)
     {
       status = fluidFn.getFuelMode(method, gradient);
-      if (method != MFnFluid::kStaticGrid && method != MFnFluid::kDynamicGrid)
-      {      
-        m_ignoreFuel = true;
-      }
+      m_ignoreFuel = (status.error() || (method != MFnFluid::kStaticGrid && method != MFnFluid::kDynamicGrid));
     }
     
     if (!m_ignoreVelocity)
     {
       status = fluidFn.getVelocityMode(method, gradient);
-      if (method != MFnFluid::kStaticGrid && method != MFnFluid::kDynamicGrid)
-      {
-        m_ignoreVelocity = true;
-      }
+      m_ignoreVelocity = (status.error() || (method != MFnFluid::kStaticGrid && method != MFnFluid::kDynamicGrid));
     }
 
     if (!m_ignoreColor)
     {
       MFnFluid::ColorMethod colorMethod;
-      fluidFn.getColorMode(colorMethod);
-      if (colorMethod == MFnFluid::kUseShadingColor)
-      {
-        m_ignoreColor = true;
-      }
+      status = fluidFn.getColorMode(colorMethod);
+      m_ignoreColor = (status.error() || colorMethod == MFnFluid::kUseShadingColor);
     }
 
     if (!m_ignorePressure && m_ignoreVelocity)
@@ -392,17 +503,14 @@ MStatus exportF3d::doIt(const MArgList& args)
     {
       MFnFluid::CoordinateMethod coordMode;
       status = fluidFn.getCoordinateMode(coordMode);
-      m_ignoreTexture = !status.error();
+      m_ignoreTexture = (status.error() || coordMode != MFnFluid::kGrid);
     }
 
     if (!m_ignoreFalloff)
     {
       MFnFluid::FalloffMethod falloffMethod;
       status = fluidFn.getFalloffMode(falloffMethod);
-      if (falloffMethod != MFnFluid::kNoFalloffGrid)
-      {
-        m_ignoreFalloff = true;
-      }
+      m_ignoreFalloff = (status.error() || falloffMethod != MFnFluid::kNoFalloffGrid);
     }
     
     if (m_verbose)
@@ -423,7 +531,9 @@ MStatus exportF3d::doIt(const MArgList& args)
     std::string fluidName;
     bool hasFramePattern = false;
     char tmp[4096];
+    size_t p = 0;
     
+    // setup output base name
     if (m_outputName.length() > 0)
     {
       fluidName = m_outputName.asChar();
@@ -431,21 +541,11 @@ MStatus exportF3d::doIt(const MArgList& args)
     else
     {
       fluidName = fluidFn.name().asChar();
-    }
-    
-    size_t p = 0;
-    
-    bool done = false;
-    while (!done)
-    {
-      p = fluidName.find_first_of(":|", p);
+      
+      p = fluidName.rfind(':');
       if (p != std::string::npos)
       {
-        fluidName[p] = '_';
-      }
-      else
-      {
-        done = true;
+        fluidName = fluidName.substr(p + 1);
       }
     }
     
@@ -621,43 +721,43 @@ MStatus exportF3d::doIt(const MArgList& args)
       
       if (m_hasDensity)
       {
-        fprintf(f, "    <channel%d ChannelName=\"%s_density\" ChannelType=\"FloatArray\" ChannelInterpretation=\"density\" SamplingType=\"Regular\" SamplingRate=\"%d\" StartTime=\"%d\" EndTime=\"%d\"/>\n",
-                d++, dagPath.partialPathName().asChar(), TimePerFrame, StartTime, EndTime);
+        fprintf(f, "    <channel%d ChannelName=\"%s_%s\" ChannelType=\"FloatArray\" ChannelInterpretation=\"density\" SamplingType=\"Regular\" SamplingRate=\"%d\" StartTime=\"%d\" EndTime=\"%d\"/>\n",
+                d++, dagPath.partialPathName().asChar(), remapChannel("density").c_str(), TimePerFrame, StartTime, EndTime);
       }
       if (m_hasVelocity)
       {
-        fprintf(f, "    <channel%d ChannelName=\"%s_velocity\" ChannelType=\"FloatArray\" ChannelInterpretation=\"velocity\" SamplingType=\"Regular\" SamplingRate=\"%d\" StartTime=\"%d\" EndTime=\"%d\"/>\n",
-                d++, dagPath.partialPathName().asChar(), TimePerFrame, StartTime, EndTime);
+        fprintf(f, "    <channel%d ChannelName=\"%s_%s\" ChannelType=\"FloatArray\" ChannelInterpretation=\"velocity\" SamplingType=\"Regular\" SamplingRate=\"%d\" StartTime=\"%d\" EndTime=\"%d\"/>\n",
+                d++, dagPath.partialPathName().asChar(), remapChannel("velocity").c_str(), TimePerFrame, StartTime, EndTime);
       }
       if (m_hasTemperature)
       {
-        fprintf(f, "    <channel%d ChannelName=\"%s_temperature\" ChannelType=\"FloatArray\" ChannelInterpretation=\"temperature\" SamplingType=\"Regular\" SamplingRate=\"%d\" StartTime=\"%d\" EndTime=\"%d\"/>\n",
-                d++, dagPath.partialPathName().asChar(), TimePerFrame, StartTime, EndTime);
+        fprintf(f, "    <channel%d ChannelName=\"%s_%s\" ChannelType=\"FloatArray\" ChannelInterpretation=\"temperature\" SamplingType=\"Regular\" SamplingRate=\"%d\" StartTime=\"%d\" EndTime=\"%d\"/>\n",
+                d++, dagPath.partialPathName().asChar(), remapChannel("temperature").c_str(), TimePerFrame, StartTime, EndTime);
       }
       if (m_hasFuel)
       {
-        fprintf(f, "    <channel%d ChannelName=\"%s_fuel\" ChannelType=\"FloatArray\" ChannelInterpretation=\"fuel\" SamplingType=\"Regular\" SamplingRate=\"%d\" StartTime=\"%d\" EndTime=\"%d\"/>\n",
-                d++, dagPath.partialPathName().asChar(), TimePerFrame, StartTime, EndTime);
+        fprintf(f, "    <channel%d ChannelName=\"%s_%s\" ChannelType=\"FloatArray\" ChannelInterpretation=\"fuel\" SamplingType=\"Regular\" SamplingRate=\"%d\" StartTime=\"%d\" EndTime=\"%d\"/>\n",
+                d++, dagPath.partialPathName().asChar(), remapChannel("fuel").c_str(), TimePerFrame, StartTime, EndTime);
       }
       if (m_hasPressure)
       {
-        fprintf(f, "    <channel%d ChannelName=\"%s_pressure\" ChannelType=\"FloatArray\" ChannelInterpretation=\"pressure\" SamplingType=\"Regular\" SamplingRate=\"%d\" StartTime=\"%d\" EndTime=\"%d\"/>\n",
-                d++, dagPath.partialPathName().asChar(), TimePerFrame, StartTime, EndTime);
+        fprintf(f, "    <channel%d ChannelName=\"%s_%s\" ChannelType=\"FloatArray\" ChannelInterpretation=\"pressure\" SamplingType=\"Regular\" SamplingRate=\"%d\" StartTime=\"%d\" EndTime=\"%d\"/>\n",
+                d++, dagPath.partialPathName().asChar(), remapChannel("pressure").c_str(), TimePerFrame, StartTime, EndTime);
       }
       if (m_hasFalloff)
       {
-        fprintf(f, "    <channel%d ChannelName=\"%s_falloff\" ChannelType=\"FloatArray\" ChannelInterpretation=\"falloff\" SamplingType=\"Regular\" SamplingRate=\"%d\" StartTime=\"%d\" EndTime=\"%d\"/>\n",
-                d++, dagPath.partialPathName().asChar(), TimePerFrame, StartTime, EndTime);
+        fprintf(f, "    <channel%d ChannelName=\"%s_%s\" ChannelType=\"FloatArray\" ChannelInterpretation=\"falloff\" SamplingType=\"Regular\" SamplingRate=\"%d\" StartTime=\"%d\" EndTime=\"%d\"/>\n",
+                d++, dagPath.partialPathName().asChar(), remapChannel("falloff").c_str(), TimePerFrame, StartTime, EndTime);
       }
       if (m_hasColor)
       {
-        fprintf(f, "    <channel%d ChannelName=\"%s_color\" ChannelType=\"FloatArray\" ChannelInterpretation=\"color\" SamplingType=\"Regular\" SamplingRate=\"%d\" StartTime=\"%d\" EndTime=\"%d\"/>\n",
-                d++, dagPath.partialPathName().asChar(), TimePerFrame, StartTime, EndTime);
+        fprintf(f, "    <channel%d ChannelName=\"%s_%s\" ChannelType=\"FloatArray\" ChannelInterpretation=\"color\" SamplingType=\"Regular\" SamplingRate=\"%d\" StartTime=\"%d\" EndTime=\"%d\"/>\n",
+                d++, dagPath.partialPathName().asChar(), remapChannel("color").c_str(), TimePerFrame, StartTime, EndTime);
       }
       if (m_hasTexture)
       {
-        fprintf(f, "    <channel%d ChannelName=\"%s_coord\" ChannelType=\"FloatArray\" ChannelInterpretation=\"coord\" SamplingType=\"Regular\" SamplingRate=\"%d\" StartTime=\"%d\" EndTime=\"%d\"/>\n",
-                d++, dagPath.partialPathName().asChar(), TimePerFrame, StartTime, EndTime);
+        fprintf(f, "    <channel%d ChannelName=\"%s_%s\" ChannelType=\"FloatArray\" ChannelInterpretation=\"texture\" SamplingType=\"Regular\" SamplingRate=\"%d\" StartTime=\"%d\" EndTime=\"%d\"/>\n",
+                d++, dagPath.partialPathName().asChar(), remapChannel("texture").c_str(), TimePerFrame, StartTime, EndTime);
       }
       
       // Dummy fields (implicit in Field3D format)
@@ -692,7 +792,6 @@ template <typename FField, typename VField, typename MField>
 void exportF3d::setF3dField(MFnFluid &fluidFn, const char *outputPath, 
                             const MDagPath &dagPath)
 {
-    
   try
   { 
     MStatus stat;
@@ -707,7 +806,7 @@ void exportF3d::setF3dField(MFnFluid &fluidFn, const char *outputPath,
     V3d size(xdim, ydim, zdim);
     const V3i res(xres, yres, zres);
     
-    int psizeTot = fluidFn.gridSize();
+    //int psizeTot = fluidFn.gridSize();
 
     /// get the transform and rotation
     MObject parentObj = fluidFn.parent(0, &stat);
@@ -797,11 +896,11 @@ void exportF3d::setF3dField(MFnFluid &fluidFn, const char *outputPath,
     if (!m_ignoreColor)
     {
       stat = fluidFn.getColors(r, b, g);
-      m_hasColor = !stat.error() && r && g && b;
+      m_hasColor = !stat.error();
       hasAnyField = hasAnyField || m_hasColor;
     }
       
-    if (m_ignoreTexture)
+    if (!m_ignoreTexture)
     {
       stat = fluidFn.getCoordinates(u, v, w);
       m_hasTexture = !stat.error();
@@ -827,7 +926,12 @@ void exportF3d::setF3dField(MFnFluid &fluidFn, const char *outputPath,
     typename FField::Ptr densityFld, tempFld, fuelFld, pressureFld, falloffFld;
     typename VField::Ptr CdFld, uvwFld;
     typename MField::Ptr vMac;
-
+    
+    typedef typename FField::value_type ScalarType;
+    typedef typename VField::value_type VectorType;
+    typedef typename VectorType::BaseType ComponentType;
+    
+    
     MPlug autoResizePlug = fluidFn.findPlug("autoResize", &stat); 
     bool autoResize;
     autoResizePlug.getValue(autoResize);
@@ -926,37 +1030,38 @@ void exportF3d::setF3dField(MFnFluid &fluidFn, const char *outputPath,
             
           if (m_hasDensity) 
           {
-            densityFld->lvalue(iX, iY, iZ) = density[i];
+            densityFld->fastLValue(iX, iY, iZ) = (ScalarType) density[i];
           }
           
           if (m_hasTemperature)
           {
-            tempFld->lvalue(iX, iY, iZ) = temp[i];
+            tempFld->fastLValue(iX, iY, iZ) = (ScalarType) temp[i];
           }
           
           if (m_hasFuel)
           {
-            fuelFld->lvalue(iX, iY, iZ) = fuel[i];
+            fuelFld->fastLValue(iX, iY, iZ) = (ScalarType) fuel[i];
           }
           
           if (m_hasPressure)
           {
-            pressureFld->lvalue(iX, iY, iZ) = pressure[i];
+            pressureFld->fastLValue(iX, iY, iZ) = (ScalarType) pressure[i];
           }
           
           if (m_hasFalloff)
           {
-            falloffFld->lvalue(iX, iY, iZ) = falloff[i];
+            falloffFld->fastLValue(iX, iY, iZ) = (ScalarType) falloff[i];
           }
           
           if (m_hasColor)
           {
-            CdFld->lvalue(iX, iY, iZ) = V3f(r[i], g[i], b[i]);
+            CdFld->fastLValue(iX, iY, iZ) = VectorType((ComponentType)r[i], (ComponentType)g[i], (ComponentType)b[i]);
           }
           
           if (m_hasTexture)
           {
-            uvwFld->lvalue(iX, iY, iZ) = V3f(u[i], v[i], w[i]);
+            // can be a 2D fluid
+            uvwFld->fastLValue(iX, iY, iZ) = VectorType((ComponentType)u[i], (ComponentType)v[i], (ComponentType)(w ? w[i] : 0.0f));
           }
         }
       }      
@@ -968,33 +1073,33 @@ void exportF3d::setF3dField(MFnFluid &fluidFn, const char *outputPath,
       
       for (z=0; z<zres; ++z)
       {
-        for(y=0; y<yres; ++y)
+        for (y=0; y<yres; ++y)
         {
-          for(x=0; x<xres+1; ++x)
+          for (x=0; x<xres+1; ++x)
           {
-            vMac->u(x, y, z) = *Xvel++;
+            vMac->u(x, y, z) = (ComponentType) Xvel[fluidFn.index(x, y, z, xres+1, yres, zres)];
           }
         }
       }
       
       for (z=0; z<zres; ++z)
       {
-        for(y=0; y<yres+1; ++y)
+        for (y=0; y<yres+1; ++y)
         {
-          for(x=0; x<xres; ++x)
+          for (x=0; x<xres; ++x)
           {
-            vMac->v(x, y, z) = *Yvel++;
+            vMac->v(x, y, z) = (ComponentType) Yvel[fluidFn.index(x, y, z, xres, yres+1, zres)];
           }
         }
       }
       
       for (z=0; z<zres+1; ++z)
       {
-        for(y=0; y<yres; ++y)
+        for (y=0; y<yres; ++y)
         {
-          for(x=0; x<xres; ++x) 
+          for (x=0; x<xres; ++x) 
           {
-            vMac->w(x, y, z) = *Zvel++;
+            vMac->w(x, y, z) = (ComponentType) (Zvel ? Zvel[fluidFn.index(x, y, z, xres, yres, zres+1)] : 0.0f);
           }
         }
       }
@@ -1008,46 +1113,53 @@ void exportF3d::setF3dField(MFnFluid &fluidFn, const char *outputPath,
       return;
     }
     
-    std::string fieldname(fluidFn.name().asChar());
-
+    std::string partition(fluidFn.name().asChar());
+    
+    // strip namespace from shape name to use as partition name
+    size_t p = partition.rfind(':');
+    if (p != std::string::npos)
+    {
+      partition = partition.substr(p + 1);
+    }
+    
     if (m_hasDensity)
     {
-        out.writeScalarLayer<typename FField::value_type>(fieldname, "density", densityFld);
+      out.writeScalarLayer<typename FField::value_type>(partition, remapChannel("density"), densityFld);
     }
     
     if (m_hasFuel)
     { 
-        out.writeScalarLayer<typename FField::value_type>(fieldname,"fuel", fuelFld);
+      out.writeScalarLayer<typename FField::value_type>(partition, remapChannel("fuel"), fuelFld);
     }
     
     if (m_hasTemperature)
     {
-        out.writeScalarLayer<typename FField::value_type>(fieldname,"temperature", tempFld);
+      out.writeScalarLayer<typename FField::value_type>(partition, remapChannel("temperature"), tempFld);
     }
     
     if (m_hasColor)
     {
-        out.writeVectorLayer<typename VField::value_type::BaseType>(fieldname, (m_forNCache ? "color" : "Cd"), CdFld);
+      out.writeVectorLayer<typename VField::value_type::BaseType>(partition, remapChannel("color"), CdFld);
     }
     
     if (m_hasVelocity)
     {
-      out.writeVectorLayer<typename MField::real_t>(fieldname, (m_forNCache ? "velocity" : "v_mac"), vMac);      
+      out.writeVectorLayer<typename MField::real_t>(partition, remapChannel("velocity"), vMac);      
     }
     
     if (m_hasTexture)
     {
-      out.writeVectorLayer<typename VField::value_type::BaseType>(fieldname, "coord", uvwFld);
+      out.writeVectorLayer<typename VField::value_type::BaseType>(partition, remapChannel("texture"), uvwFld);
     }
     
     if (m_hasFalloff)
     {
-      out.writeScalarLayer<typename FField::value_type>(fieldname, "falloff", falloffFld);
+      out.writeScalarLayer<typename FField::value_type>(partition, remapChannel("falloff"), falloffFld);
     }
     
     if (m_hasPressure)
     {
-      out.writeScalarLayer<typename FField::value_type>(fieldname, "pressure", pressureFld);
+      out.writeScalarLayer<typename FField::value_type>(partition, remapChannel("pressure"), pressureFld);
     }
 
     out.close(); 

@@ -62,6 +62,9 @@
 #include <Field3D/MACField.h>
 #include <Field3D/DenseField.h>
 #include <Field3D/InitIO.h>
+
+#include <deque>
+
 using namespace Field3D;
 
 
@@ -72,10 +75,8 @@ class Field3dCacheFormat : public MPxCacheFormat
 public:
 
 
-   Field3dCacheFormat(
-         Field3DTools::FieldTypeEnum type           = Field3DTools::DENSE ,
-         Field3DTools::FieldDataTypeEnum data_type  = Field3DTools::FLOAT
-   );
+   Field3dCacheFormat(Field3DTools::FieldTypeEnum type = Field3DTools::DENSE ,
+                      Field3DTools::FieldDataTypeEnum data_type = Field3DTools::FLOAT);
    ~Field3dCacheFormat();
 
    MString  extension() { return "f3d"; } ;
@@ -132,9 +133,11 @@ private:
    std::string  m_filename      ;
    bool         m_isFileOpened  ;
    MString      m_currentName   ;
-   bool         m_ReadNameStack ;
+   bool         m_readNameStack ;
    float        m_offset[3]     ;
-
+   
+   std::deque<std::string> m_nameStack;
+   
    // export Type
    Field3DTools::FieldTypeEnum     FIELD_TYPE       ;
    Field3DTools::FieldDataTypeEnum FIELD_DATA_TYPE  ;
