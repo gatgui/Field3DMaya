@@ -593,6 +593,24 @@ MStatus exportF3d::doIt(const MArgList& args)
       fluidName = fluidName.substr(0, n);
     }
     
+    // setup file pattern
+    std::string filePattern = fluidName;
+    
+    if (m_forNCache)
+    {
+      sprintf(tmp, "%sFrame%%d.f3d", fluidName.c_str());
+      filePattern = tmp;
+    }
+    else if (!hasFramePattern)
+    {
+      sprintf(tmp, "%s.%%04d.f3d", fluidName.c_str());
+      filePattern = tmp;
+    }
+    else
+    {
+      filePattern += ".f3d";
+    }
+    
     // Go through the selected frame range
     MComputation computation;
     computation.beginComputation();
@@ -624,22 +642,7 @@ MStatus exportF3d::doIt(const MArgList& args)
       
       fluidPath = m_outputDir + "/";
       
-      if (m_forNCache)
-      {
-        sprintf(tmp, "%sFrame%d.f3d", fluidName.c_str(), frame);
-      }
-      else
-      {
-        if (!hasFramePattern)
-        {
-          sprintf(tmp, "%s.%04d.f3d", fluidName.c_str(), frame);
-        }
-        else
-        {
-          sprintf(tmp, fluidName.c_str(), frame);
-          strcat(tmp, ".f3d");
-        }
-      }
+      sprintf(tmp, filePattern.c_str(), frame);
       
       fluidPath += tmp;
       
@@ -715,6 +718,7 @@ MStatus exportF3d::doIt(const MArgList& args)
       fprintf(f, "  <time Range=\"%d-%d\"/>\n", StartTime, EndTime);
       fprintf(f, "  <cacheTimePerFrame TimePerFrame=\"%d\"/>\n", TimePerFrame);
       fprintf(f, "  <cacheVersion Version=\"2.0\"/>\n");
+      fprintf(f, "  <extra>f3d.file=%s</extra>\n", filePattern.c_str());
       fprintf(f, "  <Channels>\n");
       
       int d = 0;
