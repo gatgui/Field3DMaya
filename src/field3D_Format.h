@@ -73,25 +73,65 @@ using namespace Field3D;
 class Field3dCacheFormat : public MPxCacheFormat
 {
 public:
-
-
-   Field3dCacheFormat(Field3DTools::FieldTypeEnum type = Field3DTools::DENSE ,
-                      Field3DTools::FieldDataTypeEnum data_type = Field3DTools::FLOAT);
+   
+   // specific creator : D = Dense , S = Sparse, F = float, H = half, D = double
+   static void *DHCreator() { return new Field3dCacheFormat(Field3DTools::DENSE, Field3DTools::HALF); }
+   static void *DFCreator() { return new Field3dCacheFormat(Field3DTools::DENSE, Field3DTools::FLOAT); }
+   static void *DDCreator() { return new Field3dCacheFormat(Field3DTools::DENSE, Field3DTools::DOUBLE); }
+   static void *SHCreator() { return new Field3dCacheFormat(Field3DTools::SPARSE, Field3DTools::HALF); }
+   static void *SFCreator() { return new Field3dCacheFormat(Field3DTools::SPARSE, Field3DTools::FLOAT); }
+   static void *SDCreator() { return new Field3dCacheFormat(Field3DTools::SPARSE, Field3DTools::DOUBLE); }
+   
+public:
+   
+   Field3dCacheFormat(Field3DTools::FieldTypeEnum type,
+                      Field3DTools::FieldDataTypeEnum data_type);
    ~Field3dCacheFormat();
-
-   MString  extension() { return "f3d"; } ;
-
-   // specific creator : D = Dense , S = Sparse, F = float , H = half
-   static void    *DHCreator()  { return new Field3dCacheFormat(Field3DTools::DENSE  , Field3DTools::HALF)  ; };
-   static void    *DFCreator()  { return new Field3dCacheFormat(Field3DTools::DENSE  , Field3DTools::FLOAT) ; };
-   static void    *SHCreator()  { return new Field3dCacheFormat(Field3DTools::SPARSE , Field3DTools::HALF)  ; };
-   static void    *SFCreator()  { return new Field3dCacheFormat(Field3DTools::SPARSE , Field3DTools::FLOAT) ; };
-
+   
+   virtual MStatus open(const MString &fileName, FileAccessMode mode);
+   virtual void close();
+   virtual MStatus isValid();
+   virtual MStatus rewind();
+   virtual MString extension(); // { return "f3d"; }
+   
+   virtual MStatus readHeader();
+   virtual MStatus beginReadChunk();
+   virtual void endReadChunk();
+   virtual MStatus readTime(MTime &time);
+   virtual MStatus findTime(MTime &time, MTime &foundTime);
+   virtual MStatus readNextTime(MTime &foundTime);
+   virtual unsigned readArraySize();
+   virtual MStatus readDoubleArray(MDoubleArray &, unsigned size);
+   virtual MStatus readFloatArray(MFloatArray &, unsigned size);
+   virtual MStatus readIntArray(MIntArray &, unsigned size);
+   virtual MStatus readDoubleVectorArray(MVectorArray &, unsigned arraySize);
+   virtual MStatus readFloatVectorArray(MFloatVectorArray &array, unsigned arraySize);
+   virtual int readInt32();
+   virtual MStatus findChannelName(const MString &name);
+   virtual MStatus readChannelName(MString &name);
+   
+   virtual MStatus writeHeader(const MString &version, MTime &startTime, MTime &endTime);
+   virtual void beginWriteChunk();
+   virtual void endWriteChunk();
+   virtual MStatus writeTime(MTime &time);
+   virtual MStatus writeDoubleArray(const MDoubleArray &);
+   virtual MStatus writeFloatArray(const MFloatArray &);
+   virtual MStatus writeIntArray(const MIntArray &);
+   virtual MStatus writeDoubleVectorArray(const MVectorArray &array);
+   virtual MStatus writeFloatVectorArray(const MFloatVectorArray &array);
+   virtual MStatus writeInt32(int);
+   virtual MStatus writeChannelName(const MString &name);
+   
+   virtual bool handlesDescription();
+   virtual MStatus readDescription(MCacheFormatDescription &description, const MString &descriptionFileLocation, const MString &baseFileName);
+   virtual MStatus writeDescription(const MCacheFormatDescription &description, const MString &descriptionFileLocation, const MString &baseFileName);
+   
+   /*
    // general functions inherited from MPxCacheFormat
    MStatus open    ( const MString& fileName, FileAccessMode mode);
    void    close   ();
    MStatus isValid ();
-
+   
    // write functions inherited from MPxCacheFormat
    MStatus writeHeader      ( const MString& version, MTime& startTime, MTime& endTime);
    MStatus writeFloatArray  ( const MFloatArray&   );
@@ -100,7 +140,7 @@ public:
    MStatus writeTime        ( MTime& time);
    void    beginWriteChunk  () {};
    void    endWriteChunk    () {};
-
+   
    // read functions inherited from MPxCacheFormat
    MStatus  readFloatArray  ( MFloatArray&  , unsigned size );
    MStatus  readDoubleArray ( MDoubleArray& , unsigned size );
@@ -110,42 +150,70 @@ public:
    MStatus  readHeader      ();
    MStatus  beginReadChunk  () {return MStatus::kSuccess;};
    void     endReadChunk    () {};
-
+   
    // timeline
    MStatus  readTime        ( MTime& time);
    MStatus  findTime        ( MTime& time, MTime& foundTime);
    MStatus  readNextTime    ( MTime& foundTime);
    MStatus  rewind();
-
-
+   */
+   
 private:
-
-
-   template< class T >  // T is MFloatArray or MDoubleArray
+   
+   template <class T>  // T is MFloatArray or MDoubleArray
    MStatus writeArray(T  &array);
-
-   template< class T >  // T is MFloatArray or MDoubleArray
+   
+   template <class T>  // T is MFloatArray or MDoubleArray
    MStatus readArray(T &array, unsigned arraySize);
-
-   Field3DInputFile   *m_inFile  ;
-   Field3DOutputFile  *m_outFile ;
-
-   std::string  m_filename      ;
-   bool         m_isFileOpened  ;
-   MString      m_currentName   ;
-   bool         m_readNameStack ;
-   float        m_offset[3]     ;
+   
+private:
+   
+   struct CacheEntry
+   {
+      MString path;
+      
+      Field3D::FieldRes::Ptr baseField;
+      
+      Field3DTools::SupportedFieldTypeEnum fieldType;
+      
+      // all supported fields pre-cast pointers
+      
+      Field3D::SparseField<Field3D::half>::Ptr shScalarField;
+      Field3D::SparseField<float>::Ptr sfScalarField;
+      Field3D::SparseField<double>::Ptr sdScalarField;
+      Field3D::DenseField<Field3D::half>::Ptr dhScalarField;
+      Field3D::DenseField<float>::Ptr dfScalarField;
+      Field3D::DenseField<double>::Ptr ddScalarField;
+      
+      Field3D::SparseField<Field3D::V3h>::Ptr shVectorField;
+      Field3D::SparseField<Field3D::V3f>::Ptr sfVectorField;
+      Field3D::SparseField<Field3D::V3d>::Ptr sdVectorField;
+      Field3D::DenseField<Field3D::V3h>::Ptr dhVectorField;
+      Field3D::DenseField<Field3D::V3f>::Ptr dfVectorField;
+      Field3D::DenseField<Field3D::V3d>::Ptr ddVectorField;
+      
+      Field3D::MACField<Field3D::V3h> mhField;
+      Field3D::MACField<Field3D::V3f> mfField;
+      Field3D::MACField<Field3D::V3d> mdField;
+   };
+   
+   std::map<MTime, CacheEntry> mCacheFiles;
+   std::map<MTime, CacheEntry>::iterator mCurCacheFile;
+   
+   Field3DInputFile *m_inFile;
+   Field3DOutputFile *m_outFile;
+   
+   std::string m_filename;
+   bool m_isFileOpened;
+   MString m_currentName;
+   bool m_readNameStack;
+   float m_offset[3];
    
    std::deque<std::string> m_nameStack;
    
    // export Type
-   Field3DTools::FieldTypeEnum     FIELD_TYPE       ;
-   Field3DTools::FieldDataTypeEnum FIELD_DATA_TYPE  ;
-
-
+   Field3DTools::FieldTypeEnum m_fieldType;
+   Field3DTools::FieldDataTypeEnum m_dataType;
 };
-
-
-
 
 #endif

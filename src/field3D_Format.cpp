@@ -43,11 +43,10 @@
 #include <maya/MPlug.h>
 #include <maya/MStatus.h>
 #include <maya/MMatrix.h>
+#include <maya/MGlobal.h>
 
-
-#include <stack>
 #include <iostream>
-
+#include <sstream>
 
 std::string extractFluidName(const MString &name)
 {
@@ -86,8 +85,7 @@ std::string extractChannelName(const MString &name)
   return nameStr.substr(pos+1);
 }
 
-
-template<typename T>
+template <typename T>
 std::string display3(T tab[3])
 {
   std::stringstream sres;
@@ -95,12 +93,10 @@ std::string display3(T tab[3])
   return sres.str();
 }
 
-
-
 // ------------------------------------------- CONSTRUCTOR - DESTRUCTOR
 
 Field3dCacheFormat::Field3dCacheFormat(Field3DTools::FieldTypeEnum type,
-                          Field3DTools::FieldDataTypeEnum data_type)
+                                       Field3DTools::FieldDataTypeEnum data_type)
 {
   Field3D::initIO();
 
@@ -112,8 +108,8 @@ Field3dCacheFormat::Field3dCacheFormat(Field3DTools::FieldTypeEnum type,
   m_offset[1] = 0.0;
   m_offset[2] = 0.0;
 
-  FIELD_TYPE = type;
-  FIELD_DATA_TYPE = data_type;
+  m_fieldType = type;
+  m_dataType = data_type;
 }
 
 Field3dCacheFormat::~Field3dCacheFormat()
@@ -129,6 +125,228 @@ Field3dCacheFormat::~Field3dCacheFormat()
   }
 }
 
+MStatus Field3dCacheFormat::open(const MString &fileName, FileAccessMode mode)
+{
+  MGlobal::displayInfo("f3dCache::open \"" + fileName + "\"");
+  if (mode == kRead || mode == kReadWrite)
+  {
+    MGlobal::displayInfo("  For reading");
+  }
+  if (mode == kWrite || mode == kReadWrite)
+  {
+    MGlobal::displayInfo("  For writing");
+  }
+  
+  return MS::kFailure;
+}
+
+void Field3dCacheFormat::close()
+{
+  MGlobal::displayInfo("f3dCache::close");
+  // don't close file: this gets called several times for the same frame
+}
+
+MStatus Field3dCacheFormat::isValid()
+{
+  MGlobal::displayInfo("f3dCache::isValid");
+  return MS::kSuccess;
+}
+
+MStatus Field3dCacheFormat::rewind()
+{
+  MGlobal::displayInfo("f3dCache::rewind");
+  return MS::kSuccess;
+}
+
+MString Field3dCacheFormat::extension()
+{
+  return "f3d";
+}
+
+MStatus Field3dCacheFormat::readHeader()
+{
+  MGlobal::displayInfo("f3dCache::readHeader");
+  return MS::kFailure;
+}
+
+MStatus Field3dCacheFormat::beginReadChunk()
+{
+  MGlobal::displayInfo("f3dCache::beginReadChunk");
+  return MS::kFailure;
+}
+
+void Field3dCacheFormat::endReadChunk()
+{
+  MGlobal::displayInfo("f3dCache::endReadChunk");
+}
+
+MStatus Field3dCacheFormat::readTime(MTime &time)
+{
+  MGlobal::displayInfo("f3dCache::readTime");
+  return MS::kFailure;
+}
+
+MStatus Field3dCacheFormat::findTime(MTime &time, MTime &foundTime)
+{
+  std::ostringstream oss;
+  oss << time.as(MTime::uiUnit());
+  
+  MGlobal::displayInfo(MString("f3dCache::findTime ") + oss.str().c_str());
+  return MS::kFailure;
+}
+
+MStatus Field3dCacheFormat::readNextTime(MTime &foundTime)
+{
+  MGlobal::displayInfo("f3dCache::readNextTime");
+  return MS::kFailure;
+}
+
+unsigned Field3dCacheFormat::readArraySize()
+{
+  MGlobal::displayInfo("f3dCache::readArraySize");
+  return 0;
+}
+
+MStatus Field3dCacheFormat::readDoubleArray(MDoubleArray &, unsigned size)
+{
+  MGlobal::displayInfo("f3dCache::readDoubleArray");
+  return MS::kFailure;
+}
+
+MStatus Field3dCacheFormat::readFloatArray(MFloatArray &, unsigned size)
+{
+  MGlobal::displayInfo("f3dCache::beginReadChunk");
+  return MS::kFailure;
+}
+
+MStatus Field3dCacheFormat::readIntArray(MIntArray &, unsigned size)
+{
+  MGlobal::displayInfo("f3dCache::readIntArray");
+  return MS::kFailure;
+}
+
+MStatus Field3dCacheFormat::readDoubleVectorArray(MVectorArray &, unsigned arraySize)
+{
+  MGlobal::displayInfo("f3dCache::readDoubleVectorArray");
+  return MS::kFailure;
+}
+
+MStatus Field3dCacheFormat::readFloatVectorArray(MFloatVectorArray &array, unsigned arraySize)
+{
+  MGlobal::displayInfo("f3dCache::readFloatVectorArray");
+  return MS::kFailure;
+}
+
+int Field3dCacheFormat::readInt32()
+{
+  MGlobal::displayInfo("f3dCache::readInt32");
+  return 0;
+}
+
+MStatus Field3dCacheFormat::findChannelName(const MString &name)
+{
+  MGlobal::displayInfo("f3dCache::findChannelName \"" + name + "\"");
+  return MS::kFailure;
+}
+
+MStatus Field3dCacheFormat::readChannelName(MString &name)
+{
+  MGlobal::displayInfo("f3dCache::readChannelName");
+  return MS::kFailure;
+}
+
+MStatus Field3dCacheFormat::writeHeader(const MString &version, MTime &startTime, MTime &endTime)
+{
+  std::ostringstream oss;
+  oss << startTime.as(MTime::uiUnit()) << " - " << endTime.as(MTime::uiUnit());
+  
+  MGlobal::displayInfo("f3dCache::writeHeader " + version + ", " + oss.str().c_str());
+  return MS::kFailure;
+}
+
+void Field3dCacheFormat::beginWriteChunk()
+{
+  MGlobal::displayInfo("f3dCache::beginWriteChunk");
+}
+
+void Field3dCacheFormat::endWriteChunk()
+{
+  MGlobal::displayInfo("f3dCache::endWriteChunk");
+}
+
+MStatus Field3dCacheFormat::writeTime(MTime &time)
+{
+  std::ostringstream oss;
+  oss << time.as(MTime::uiUnit());
+  
+  MGlobal::displayInfo(MString("f3dCache::writeTime ") + oss.str().c_str());
+  return MS::kFailure;
+}
+
+MStatus Field3dCacheFormat::writeDoubleArray(const MDoubleArray &)
+{
+  MGlobal::displayInfo("f3dCache::writeDoubleArray");
+  return MS::kFailure;
+}
+
+MStatus Field3dCacheFormat::writeFloatArray(const MFloatArray &)
+{
+  MGlobal::displayInfo("f3dCache::writeFloatArray");
+  return MS::kFailure;
+}
+
+MStatus Field3dCacheFormat::writeIntArray(const MIntArray &)
+{
+  MGlobal::displayInfo("f3dCache::writeIntArray");
+  return MS::kFailure;
+}
+
+MStatus Field3dCacheFormat::writeDoubleVectorArray(const MVectorArray &array)
+{
+  MGlobal::displayInfo("f3dCache::writeDoubleVectorArray");
+  return MS::kFailure;
+}
+
+MStatus Field3dCacheFormat::writeFloatVectorArray(const MFloatVectorArray &array)
+{
+  MGlobal::displayInfo("f3dCache::writeFloatVectorArray");
+  return MS::kFailure;
+}
+
+MStatus Field3dCacheFormat::writeInt32(int value)
+{
+  std::ostringstream oss;
+  oss << value;
+  
+  MGlobal::displayInfo(MString("f3dCache::writeInt32 ") + oss.str().c_str());
+  return MS::kFailure;
+}
+
+MStatus Field3dCacheFormat::writeChannelName(const MString &name)
+{
+  MGlobal::displayInfo("f3dCache::writeChannelName \"" + name + "\"");
+  return MS::kFailure;
+}
+
+bool Field3dCacheFormat::handlesDescription()
+{
+  MGlobal::displayInfo("f3dCache::handlesDescription");
+  return true;
+}
+
+MStatus Field3dCacheFormat::readDescription(MCacheFormatDescription &description, const MString &descriptionFileLocation, const MString &baseFileName)
+{
+  MGlobal::displayInfo("f3dCache::readDescription \"" + descriptionFileLocation + "\", \"" + baseFileName + "\"");
+  return MPxCacheFormat::readDescription(description, descriptionFileLocation, baseFileName);
+}
+
+MStatus Field3dCacheFormat::writeDescription(const MCacheFormatDescription &description, const MString &descriptionFileLocation, const MString &baseFileName)
+{
+  MGlobal::displayInfo("f3dCache::writeDescription \"" + descriptionFileLocation + "\", \"" + baseFileName + "\"");
+  return MPxCacheFormat::writeDescription(description, descriptionFileLocation, baseFileName);
+}
+
+/*
 MStatus Field3dCacheFormat::open(const MString& fileName, FileAccessMode mode)
 {
   if (fileName == m_filename.c_str())
@@ -252,7 +470,7 @@ void Field3dCacheFormat::close()
 
 //--------------------------------------- WRITE ---------------------------
 
-MStatus Field3dCacheFormat::writeHeader(const MString& /*version*/, MTime& /*startTime*/, MTime& /*endTime*/)
+MStatus Field3dCacheFormat::writeHeader(const MString &version, MTime &startTime, MTime &endTime)
 {
   // Offset only needs to be kept separately for Maya.
   // We can't write it as a HDF5 partition's attribute nor
@@ -306,9 +524,10 @@ MStatus Field3dCacheFormat::writeChannelName(const MString& name)
   m_currentName = name;
   return MS::kSuccess;
 }
+*/
 
-template< class T > // T is MFloatArray or MDoubleArray
-MStatus Field3dCacheFormat::writeArray( T &/*array*/ )
+template <class T> // T is MFloatArray or MDoubleArray
+MStatus Field3dCacheFormat::writeArray(T &array)
 {
   if (!m_outFile)
   {
@@ -402,9 +621,9 @@ MStatus Field3dCacheFormat::writeArray( T &/*array*/ )
     if (falloff)     data = fluid.falloff()     ;
 
     // select the propers function
-    if ( FIELD_DATA_TYPE == Field3DTools::HALF)
+    if ( m_dataType == Field3DTools::HALF)
     {
-      if ( FIELD_TYPE == Field3DTools::SPARSE )
+      if ( m_fieldType == Field3DTools::SPARSE )
       {
         writeScalarFuncPtr = &Field3DTools::writeSparseScalarField<Field3D::half> ;
       }
@@ -413,9 +632,9 @@ MStatus Field3dCacheFormat::writeArray( T &/*array*/ )
         writeScalarFuncPtr = &Field3DTools::writeDenseScalarField<Field3D::half> ;
       }
     }
-    else if ( FIELD_DATA_TYPE == Field3DTools::FLOAT)
+    else if ( m_dataType == Field3DTools::FLOAT)
     {
-      if ( FIELD_TYPE == Field3DTools::SPARSE )
+      if ( m_fieldType == Field3DTools::SPARSE )
       {
         writeScalarFuncPtr = &Field3DTools::writeSparseScalarField<float>;
       }
@@ -453,11 +672,11 @@ MStatus Field3dCacheFormat::writeArray( T &/*array*/ )
     // as we don't know how the threshold can affect them
     if (velocity)
     {
-      if ( FIELD_DATA_TYPE == Field3DTools::HALF )
+      if ( m_dataType == Field3DTools::HALF )
       {
         writeVectorFuncPtr = &Field3DTools::writeMACVectorField<Field3D::half> ;
       }
-      else if ( FIELD_DATA_TYPE == Field3DTools::FLOAT )
+      else if ( m_dataType == Field3DTools::FLOAT )
       {
         writeVectorFuncPtr = &Field3DTools::writeMACVectorField<float> ;
       }
@@ -469,9 +688,9 @@ MStatus Field3dCacheFormat::writeArray( T &/*array*/ )
     }
     else
     {
-      if ( FIELD_DATA_TYPE == Field3DTools::HALF )
+      if ( m_dataType == Field3DTools::HALF )
       {
-        if ( FIELD_TYPE == Field3DTools::SPARSE )
+        if ( m_fieldType == Field3DTools::SPARSE )
         {
           writeVectorFuncPtr = &Field3DTools::writeSparseVectorField<Field3D::half> ;
         }
@@ -480,9 +699,9 @@ MStatus Field3dCacheFormat::writeArray( T &/*array*/ )
           writeVectorFuncPtr = &Field3DTools::writeDenseVectorField<Field3D::half> ;
         }
       }
-      else if ( FIELD_DATA_TYPE == Field3DTools::FLOAT )
+      else if ( m_dataType == Field3DTools::FLOAT )
       {
-        if ( FIELD_TYPE == Field3DTools::SPARSE )
+        if ( m_fieldType == Field3DTools::SPARSE )
         {
           writeVectorFuncPtr = &Field3DTools::writeSparseVectorField<float> ;
         }
@@ -512,6 +731,7 @@ MStatus Field3dCacheFormat::writeArray( T &/*array*/ )
 
 }
 
+/*
 MStatus Field3dCacheFormat::writeDoubleArray(const MDoubleArray& array)
 {
   return writeArray(array);
@@ -521,9 +741,11 @@ MStatus Field3dCacheFormat::writeFloatArray(const MFloatArray& array)
 {
   return writeArray(array);
 }
+*/
 
 //-------------------------------------------------- READ -------------------------------------------------------
 
+/*
 MStatus Field3dCacheFormat::readHeader()
 {
   // this function seems to be never invoked ...
@@ -690,8 +912,9 @@ unsigned Field3dCacheFormat::readArraySize()
   return size;
 
 }
+*/
 
-template< class T> // T is MFloatArray or MDoubleArray
+template <class T> // T is MFloatArray or MDoubleArray
 MStatus Field3dCacheFormat::readArray(T &array, unsigned int arraySize)
 {
   if (!m_inFile)
@@ -830,6 +1053,7 @@ MStatus Field3dCacheFormat::readArray(T &array, unsigned int arraySize)
   return  MS::kSuccess;
 }
 
+/*
 MStatus Field3dCacheFormat::readFloatArray(MFloatArray& array, unsigned arraySize)
 {
   return readArray(array, arraySize);
@@ -842,7 +1066,7 @@ MStatus Field3dCacheFormat::readDoubleArray(MDoubleArray& array, unsigned arrayS
 
 // -------------------------------------------------- TIME ---------------------------
 
-MStatus Field3dCacheFormat::readTime(MTime& /*time*/)
+MStatus Field3dCacheFormat::readTime(MTime &time)
 {
   //cout<<red<<"readTime "<<normal<<endl;
 
@@ -858,7 +1082,7 @@ MStatus Field3dCacheFormat::readTime(MTime& /*time*/)
   return (frameNumber > 0 ? MS::kSuccess : MS::kFailure);
 }
 
-MStatus Field3dCacheFormat::writeTime(MTime& /*time*/)
+MStatus Field3dCacheFormat::writeTime(MTime &time)
 {
   return MS::kSuccess;
 }
@@ -946,10 +1170,4 @@ MStatus Field3dCacheFormat::findTime(MTime& time, MTime& foundTime)
 
   return MS::kFailure;
 }
-
-
-
-
-
-
-
+*/

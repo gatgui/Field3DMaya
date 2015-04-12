@@ -80,7 +80,8 @@ enum FieldTypeEnum
 enum FieldDataTypeEnum
 {
    FLOAT,
-   HALF
+   HALF,
+   DOUBLE
 };
 
 // ---------------------  Infos
