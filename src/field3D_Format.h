@@ -168,6 +168,9 @@ private:
    */
    
    template <class T>
+   MStatus readArray(T &array, unsigned long arraySize);
+   
+   template <class T>
    MStatus writeArray(T &array);
    
 private:
@@ -177,7 +180,10 @@ private:
    
    FileAccessMode m_mode;
    
+   std::string m_inFilename;
    Field3DInputFile *m_inFile;
+   std::string m_inPartition;
+   std::string m_inChannel;
    
    std::string m_outFilename;
    Field3DOutputFile *m_outFile;
@@ -190,34 +196,13 @@ private:
    struct CacheEntry
    {
       MString path;
-      
-      Field3D::FieldRes::Ptr baseField;
-      
-      Field3DTools::SupportedFieldTypeEnum fieldType;
-      
-      // all supported fields pre-cast pointers
-      
-      Field3D::SparseField<Field3D::half>::Ptr shScalarField;
-      Field3D::SparseField<float>::Ptr sfScalarField;
-      Field3D::SparseField<double>::Ptr sdScalarField;
-      Field3D::DenseField<Field3D::half>::Ptr dhScalarField;
-      Field3D::DenseField<float>::Ptr dfScalarField;
-      Field3D::DenseField<double>::Ptr ddScalarField;
-      
-      Field3D::SparseField<Field3D::V3h>::Ptr shVectorField;
-      Field3D::SparseField<Field3D::V3f>::Ptr sfVectorField;
-      Field3D::SparseField<Field3D::V3d>::Ptr sdVectorField;
-      Field3D::DenseField<Field3D::V3h>::Ptr dhVectorField;
-      Field3D::DenseField<Field3D::V3f>::Ptr dfVectorField;
-      Field3D::DenseField<Field3D::V3d>::Ptr ddVectorField;
-      
-      Field3D::MACField<Field3D::V3h> mhField;
-      Field3D::MACField<Field3D::V3f> mfField;
-      Field3D::MACField<Field3D::V3d> mdField;
+      std::map<std::string, Field3DTools::Fld> fields;
    };
    
+   std::map<std::string, std::string> m_remapChannels;
    std::map<MTime, CacheEntry> m_cacheFiles;
    std::map<MTime, CacheEntry>::iterator m_curCacheFile;
+   std::map<std::string, Field3DTools::Fld>::iterator m_curField;
    
    bool identifyPath(const MString &path, MString &dirname, MString &basename, MString &frame, MTime &t, MString &ext);
    unsigned long fillCacheFiles(const MString &path);

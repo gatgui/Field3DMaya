@@ -76,50 +76,40 @@ void getFieldNames( Field3DInputFile *file, vector< string > &names)
   getFieldNames( file, "", names );
 }
 
-template <typename T>
-bool getHighestResolution(Field3D::Field3DInputFile *inFile, const std::string &partition, const std::string &name, unsigned int (&resMax)[3])
-{
-
-  // take the highest resolution of all layers
-  bool found = false;
-  
-  // loop through scalars fields
-  typename Field3D::Field<T>::Vec scalarfields = readScalarLayers<T>(inFile, partition, name);
-  typename Field3D::Field<T>::Vec::const_iterator its = scalarfields.begin();
-  
-  for (; its != scalarfields.end(); ++its)
-  {
-    resMax[0] = ( (unsigned int) (*its)->dataResolution().x > resMax[0]) ? (*its)->dataResolution().x : resMax[0];
-    resMax[1] = ( (unsigned int) (*its)->dataResolution().y > resMax[1]) ? (*its)->dataResolution().y : resMax[1];
-    resMax[2] = ( (unsigned int) (*its)->dataResolution().z > resMax[2]) ? (*its)->dataResolution().z : resMax[2];
-    found = true || found;
-  }
-
-  // loop through vector fields
-  typename Field3D::Field< FIELD3D_VEC3_T<T> >::Vec vectorfields = readVectorLayers<T>(inFile, partition, name);
-  typename Field3D::Field< FIELD3D_VEC3_T<T> >::Vec::const_iterator itv = vectorfields.begin();
-  
-  for (; itv != vectorfields.end(); ++itv)
-  {
-    resMax[0] = ( (unsigned int) (*itv)->dataResolution().x > resMax[0]) ? (*itv)->dataResolution().x : resMax[0];
-    resMax[1] = ( (unsigned int) (*itv)->dataResolution().y > resMax[1]) ? (*itv)->dataResolution().y : resMax[1];
-    resMax[2] = ( (unsigned int) (*itv)->dataResolution().z > resMax[2]) ? (*itv)->dataResolution().z : resMax[2];
-    found = true || found;
-  }
-
-  return found;
-}
-
 bool getFieldsResolution(Field3D::Field3DInputFile *inFile, const std::string &partition, const std::string &name, unsigned int (&resolution)[3])
 {
   bool found = false;
   
   resolution[0] = resolution[1] = resolution[2] = 0;
   
-  found = getHighestResolution<Field3D::half>(inFile, partition, name, resolution) || found;
-  found = getHighestResolution<float>(inFile, partition, name, resolution) || found;
-  found = getHighestResolution<double>(inFile, partition, name, resolution) || found;
+  // take the highest resolution of all layers
   
+  // Note: don't need to check for half/float/double, readProxyLayer actually ignores the base type
+  
+  // loop through scalars fields
+  typename Field3D::EmptyField<Field3D::half>::Vec scalarfields = readProxyScalarLayers<Field3D::half>(inFile, partition, name);
+  typename Field3D::EmptyField<Field3D::half>::Vec::const_iterator its = scalarfields.begin();
+  
+  for (; its != scalarfields.end(); ++its)
+  {
+    resolution[0] = ( (unsigned int) (*its)->dataResolution().x > resolution[0]) ? (*its)->dataResolution().x : resolution[0];
+    resolution[1] = ( (unsigned int) (*its)->dataResolution().y > resolution[1]) ? (*its)->dataResolution().y : resolution[1];
+    resolution[2] = ( (unsigned int) (*its)->dataResolution().z > resolution[2]) ? (*its)->dataResolution().z : resolution[2];
+    found = true || found;
+  }
+
+  // loop through vector fields
+  typename Field3D::EmptyField<FIELD3D_VEC3_T<Field3D::half> >::Vec vectorfields = readProxyVectorLayers<Field3D::half>(inFile, partition, name);
+  typename Field3D::EmptyField<FIELD3D_VEC3_T<Field3D::half> >::Vec::const_iterator itv = vectorfields.begin();
+  
+  for (; itv != vectorfields.end(); ++itv)
+  {
+    resolution[0] = ( (unsigned int) (*itv)->dataResolution().x > resolution[0]) ? (*itv)->dataResolution().x : resolution[0];
+    resolution[1] = ( (unsigned int) (*itv)->dataResolution().y > resolution[1]) ? (*itv)->dataResolution().y : resolution[1];
+    resolution[2] = ( (unsigned int) (*itv)->dataResolution().z > resolution[2]) ? (*itv)->dataResolution().z : resolution[2];
+    found = true || found;
+  }
+
   return found;
 }
 
@@ -133,6 +123,7 @@ bool getFieldsResolution(Field3D::Field3DInputFile *inFile, unsigned int (&resol
   return getFieldsResolution(inFile, "", "", resolution);
 }
 
+/*
 template<typename Data_Type>
 bool testScalarDataType(Field3DInputFile *inFile, const std::string &partition, const std::string &name)
 {
@@ -140,147 +131,231 @@ bool testScalarDataType(Field3DInputFile *inFile, const std::string &partition, 
   return (!res.empty());
 }
 
-
 template<typename Data_Type>
 bool testVectorDataType(Field3DInputFile *inFile, const std::string &partition, const std::string &name)
 {
   typename Field<FIELD3D_VEC3_T<Data_Type> >::Vec res = readVectorLayers<Data_Type>(inFile, partition, name);
   return (!res.empty());
 }
+*/
 
-bool getFieldValueType( Field3DInputFile *inFile , const std::string &partition, const std::string &name , SupportedFieldTypeEnum &type )
+bool getFieldValueType( Field3DInputFile *inFile , const std::string &partition, const std::string &name, Fld &fld)
 {
   typedef Field3D::half half;
   
-  // TODO : template for below
-  if ( Field3DTools::testScalarDataType<half>(inFile, partition, name) )
+  Field<half>::Vec hsres = readScalarLayers<half>(inFile, partition, name);
+  if (!hsres.empty())
   {
-    Field<half>::Vec res = readScalarLayers<half>(inFile, partition, name);
-    
-    if ( !res.empty() )
+    Field3D::DenseField<half>::Ptr fieldD = Field3D::field_dynamic_cast<Field3D::DenseField<half> >(hsres[0]);
+    if (fieldD)
     {
-      Field3D::DenseField<half>::Ptr fieldD = Field3D::field_dynamic_cast<Field3D::DenseField<half> >(res[0]);
-      if ( fieldD ) { type = DenseScalarField_Half; return true; }
-      
-      Field3D::SparseField<half>::Ptr fieldS = Field3D::field_dynamic_cast<Field3D::SparseField<half> >(res[0]);
-      if ( fieldS ) { type = SparseScalarField_Half; return true; }
-      
-      // error
-      ERROR( "Type of half scalar field " + name + " unknown : not a dense field nor a sparse field nor a MAC field");
-      type = TypeUnsupported;
-      return false;
+      fld.fieldType = DenseScalarField_Half;
+      fld.baseField = fieldD;
+      fld.dhScalarField = fieldD;
+      return true;
     }
-  }
-  else if ( Field3DTools::testScalarDataType<float>(inFile, partition, name) )
-  {
-    Field<float>::Vec res = readScalarLayers<float>(inFile, partition, name);
     
-    if ( !res.empty() )
+    Field3D::SparseField<half>::Ptr fieldS = Field3D::field_dynamic_cast<Field3D::SparseField<half> >(hsres[0]);
+    if (fieldS)
     {
-      Field3D::DenseField<float>::Ptr fieldD = Field3D::field_dynamic_cast<Field3D::DenseField<float> >(res[0]);
-      if ( fieldD ) { type = DenseScalarField_Float; return true  ;}
-      
-      Field3D::SparseField<float>::Ptr fieldS = Field3D::field_dynamic_cast<Field3D::SparseField<float> >(res[0]);
-      if ( fieldS ) { type = SparseScalarField_Float; return true; }
-      
-      // error
-      ERROR( "Type of float scalar field " + name + " unknown : not a dense field nor a sparse field nor a MAC field");
-      type = TypeUnsupported;
-      return false;
+      fld.fieldType = SparseScalarField_Half;
+      fld.baseField = fieldS;
+      fld.shScalarField = fieldS;
+      return true;
     }
-  }
-  else if ( Field3DTools::testScalarDataType<double>(inFile, partition, name) )
-  {
-    Field<double>::Vec res = readScalarLayers<double>(inFile, partition, name);
     
-    if ( !res.empty() )
-    {
-      Field3D::DenseField<double>::Ptr fieldD = Field3D::field_dynamic_cast<Field3D::DenseField<double> >(res[0]);
-      if ( fieldD ) { type = DenseScalarField_Double; return true  ;}
-      
-      Field3D::SparseField<double>::Ptr fieldS = Field3D::field_dynamic_cast<Field3D::SparseField<double> >(res[0]);
-      if ( fieldS ) { type = SparseScalarField_Double; return true; }
-      
-      // error
-      ERROR( "Type of float scalar field " + name + " unknown : not a dense field nor a sparse field nor a MAC field");
-      type = TypeUnsupported;
-      return false;
-    }
-  }
-  else if ( Field3DTools::testVectorDataType<half>(inFile, partition, name) )
-  {
-    Field<FIELD3D_VEC3_T<half> >::Vec res = readVectorLayers<half>(inFile, partition, name);
+    // error
+    ERROR( "Type of half scalar field " + name + " unknown : not a dense field nor a sparse field nor a MAC field");
     
-    if ( !res.empty() )
+    fld.fieldType = TypeUnsupported;
+    
+    return false;
+  }
+  
+  Field<float>::Vec fsres = readScalarLayers<float>(inFile, partition, name);
+  if (!fsres.empty())
+  {
+    Field3D::DenseField<float>::Ptr fieldD = Field3D::field_dynamic_cast<Field3D::DenseField<float> >(fsres[0]);
+    if (fieldD)
     {
-      Field3D::DenseField<Field3D::V3h>::Ptr fieldD = Field3D::field_dynamic_cast<Field3D::DenseField<Field3D::V3h> >(res[0]);
-      if ( fieldD ) { type = DenseVectorField_Half; return true; }
-      
-      Field3D::SparseField<Field3D::V3h>::Ptr fieldS = Field3D::field_dynamic_cast<Field3D::SparseField<Field3D::V3h> >(res[0]);
-      if ( fieldS ) { type = SparseVectorField_Half; return true; }
-      
-      Field3D::MACField<Field3D::V3h>::Ptr fieldM = Field3D::field_dynamic_cast<Field3D::MACField<Field3D::V3h> >(res[0]);
-      if ( fieldM ) { type = MACField_Half; return true;}
-      
-      // error
-      ERROR( "Type of half vector field " + name + " unknown : not a dense field nor a sparse field nor a MAC Field");
-      type = TypeUnsupported;
-      return false;
+      fld.fieldType = DenseScalarField_Float;
+      fld.baseField = fieldD;
+      fld.dfScalarField = fieldD;
+      return true;
     }
+    
+    Field3D::SparseField<float>::Ptr fieldS = Field3D::field_dynamic_cast<Field3D::SparseField<float> >(fsres[0]);
+    if (fieldS)
+    {
+      fld.fieldType = SparseScalarField_Float;
+      fld.baseField = fieldS;
+      fld.sfScalarField = fieldS;
+      return true;
+    }
+    
+    // error
+    ERROR( "Type of float scalar field " + name + " unknown : not a dense field nor a sparse field nor a MAC field");
+    
+    fld.fieldType = TypeUnsupported;
+    
+    return false;
   }
-  else if( Field3DTools::testVectorDataType<float>(inFile, partition, name) )
+  
+  Field<double>::Vec dsres = readScalarLayers<double>(inFile, partition, name);
+  if (!dsres.empty())
   {
-      Field<FIELD3D_VEC3_T<float> >::Vec res = readVectorLayers<float>(inFile, partition, name);
-      
-      if ( !res.empty() )
-      {
-        Field3D::DenseField<Field3D::V3f>::Ptr fieldD = Field3D::field_dynamic_cast<Field3D::DenseField<Field3D::V3f> >(res[0]);
-        if ( fieldD ) { type = DenseVectorField_Float; return true; }
-        
-        Field3D::SparseField<Field3D::V3f>::Ptr fieldS = Field3D::field_dynamic_cast<Field3D::SparseField<Field3D::V3f> >(res[0]);
-        if ( fieldS ) { type = SparseVectorField_Float; return true; }
-        
-        Field3D::MACField<Field3D::V3f>::Ptr fieldM = Field3D::field_dynamic_cast<Field3D::MACField<Field3D::V3f> >(res[0]);
-        if ( fieldM ) { type = MACField_Float; return true; }
-        
-        // error
-        ERROR( "Type of float vector field " + name + " unknown : not a dense field nor a sparse field nor a MAC Field");
-        type = TypeUnsupported;
-        return false;
-      }
+    Field3D::DenseField<double>::Ptr fieldD = Field3D::field_dynamic_cast<Field3D::DenseField<double> >(dsres[0]);
+    if (fieldD)
+    {
+      fld.fieldType = DenseScalarField_Double;
+      fld.baseField = fieldD;
+      fld.ddScalarField = fieldD;
+      return true;
+    }
+    
+    Field3D::SparseField<double>::Ptr fieldS = Field3D::field_dynamic_cast<Field3D::SparseField<double> >(dsres[0]);
+    if (fieldS)
+    {
+      fld.fieldType = SparseScalarField_Double;
+      fld.baseField = fieldS;
+      fld.sdScalarField = fieldS;
+      return true;
+    }
+    
+    // error
+    ERROR( "Type of float scalar field " + name + " unknown : not a dense field nor a sparse field nor a MAC field");
+    
+    fld.fieldType = TypeUnsupported;
+    
+    return false;
   }
-  else if( Field3DTools::testVectorDataType<double>(inFile, partition, name) )
+  
+  Field<FIELD3D_VEC3_T<half> >::Vec hvres = readVectorLayers<half>(inFile, partition, name);
+  if (!hvres.empty())
   {
-      Field<FIELD3D_VEC3_T<double> >::Vec res = readVectorLayers<double>(inFile, partition, name);
-      
-      if ( !res.empty() )
-      {
-        Field3D::DenseField<Field3D::V3d>::Ptr fieldD = Field3D::field_dynamic_cast< Field3D::DenseField<Field3D::V3d> >(res[0]);
-        if ( fieldD ) { type = DenseVectorField_Double; return true; }
-        
-        Field3D::SparseField<Field3D::V3d>::Ptr fieldS = Field3D::field_dynamic_cast< Field3D::SparseField<Field3D::V3d> >(res[0]);
-        if ( fieldS ) { type = SparseVectorField_Double; return true; }
-        
-        Field3D::MACField<Field3D::V3d>::Ptr fieldM = Field3D::field_dynamic_cast< Field3D::MACField<Field3D::V3d> >(res[0]);
-        if ( fieldM ) { type = MACField_Double; return true; }
-        
-        // error
-        ERROR( "Type of float vector field " + name + " unknown : not a dense field nor a sparse field nor a MAC Field");
-        type = TypeUnsupported;
-        return false;
-      }
+    Field3D::DenseField<Field3D::V3h>::Ptr fieldD = Field3D::field_dynamic_cast<Field3D::DenseField<Field3D::V3h> >(hvres[0]);
+    if (fieldD)
+    {
+      fld.fieldType = DenseVectorField_Half;
+      fld.baseField = fieldD;
+      fld.dhVectorField = fieldD;
+      return true;
+    }
+    
+    Field3D::SparseField<Field3D::V3h>::Ptr fieldS = Field3D::field_dynamic_cast<Field3D::SparseField<Field3D::V3h> >(hvres[0]);
+    if (fieldS)
+    {
+      fld.fieldType = SparseVectorField_Half;
+      fld.baseField = fieldS;
+      fld.shVectorField = fieldS;
+      return true;
+    }
+    
+    Field3D::MACField<Field3D::V3h>::Ptr fieldM = Field3D::field_dynamic_cast<Field3D::MACField<Field3D::V3h> >(hvres[0]);
+    if (fieldM)
+    {
+      fld.fieldType = MACField_Half;
+      fld.baseField = fieldM;
+      fld.mhField = fieldM;
+      return true;
+    }
+    
+    // error
+    ERROR( "Type of half vector field " + name + " unknown : not a dense field nor a sparse field nor a MAC Field");
+    
+    fld.fieldType = TypeUnsupported;
+    
+    return false;
+  }
+  
+  Field<FIELD3D_VEC3_T<float> >::Vec fvres = readVectorLayers<float>(inFile, partition, name);
+  if (!fvres.empty())
+  {
+    Field3D::DenseField<Field3D::V3f>::Ptr fieldD = Field3D::field_dynamic_cast<Field3D::DenseField<Field3D::V3f> >(fvres[0]);
+    if (fieldD)
+    {
+      fld.fieldType = DenseVectorField_Float;
+      fld.baseField = fieldD;
+      fld.dfVectorField = fieldD;
+      return true;
+    }
+    
+    Field3D::SparseField<Field3D::V3f>::Ptr fieldS = Field3D::field_dynamic_cast<Field3D::SparseField<Field3D::V3f> >(fvres[0]);
+    if (fieldS)
+    {
+      fld.fieldType = SparseVectorField_Float;
+      fld.baseField = fieldS;
+      fld.sfVectorField = fieldS;
+      return true;
+    }
+    
+    Field3D::MACField<Field3D::V3f>::Ptr fieldM = Field3D::field_dynamic_cast<Field3D::MACField<Field3D::V3f> >(fvres[0]);
+    if (fieldM)
+    {
+      fld.fieldType = MACField_Float;
+      fld.baseField = fieldM;
+      fld.mfField = fieldM;
+      return true;
+    }
+    
+    // error
+    ERROR( "Type of float vector field " + name + " unknown : not a dense field nor a sparse field nor a MAC Field");
+    
+    fld.fieldType = TypeUnsupported;
+    
+    return false;
+  }
+  
+  Field<FIELD3D_VEC3_T<double> >::Vec dvres = readVectorLayers<double>(inFile, partition, name);
+  if (!dvres.empty())
+  {
+    Field3D::DenseField<Field3D::V3d>::Ptr fieldD = Field3D::field_dynamic_cast< Field3D::DenseField<Field3D::V3d> >(dvres[0]);
+    if (fieldD)
+    {
+      fld.fieldType = DenseVectorField_Double;
+      fld.baseField = fieldD;
+      fld.ddVectorField = fieldD;
+      return true;
+    }
+    
+    Field3D::SparseField<Field3D::V3d>::Ptr fieldS = Field3D::field_dynamic_cast< Field3D::SparseField<Field3D::V3d> >(dvres[0]);
+    if (fieldS)
+    {
+      fld.fieldType = SparseVectorField_Double;
+      fld.baseField = fieldS;
+      fld.sdVectorField = fieldS;
+      return true;
+    }
+    
+    Field3D::MACField<Field3D::V3d>::Ptr fieldM = Field3D::field_dynamic_cast< Field3D::MACField<Field3D::V3d> >(dvres[0]);
+    if (fieldM)
+    {
+      fld.fieldType = MACField_Double;
+      fld.baseField = fieldM;
+      fld.mdField = fieldM;
+      return true;
+    }
+    
+    // error
+    ERROR( "Type of float vector field " + name + " unknown : not a dense field nor a sparse field nor a MAC Field");
+    
+    fld.fieldType = TypeUnsupported;
+    
+    return false;
   }
   
   // error
   ERROR( std::string("Type of data in field ") + name + " unknown : not a float field nor a half float field");
-  type = TypeUnsupported;
+  
+  fld.fieldType = TypeUnsupported;
+  
   return false;
 
 }
 
-bool getFieldValueType( Field3DInputFile *inFile , const std::string &name , SupportedFieldTypeEnum &type )
+bool getFieldValueType( Field3DInputFile *inFile , const std::string &name , Fld &fld )
 {
-  return getFieldValueType( inFile, "", name, type );
+  return getFieldValueType( inFile, "", name, fld );
 }
 
 
