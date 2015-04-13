@@ -219,6 +219,10 @@ private:
    std::map<MTime, CacheEntry> m_cacheFiles;
    std::map<MTime, CacheEntry>::iterator m_curCacheFile;
    
+   bool identifyPath(const MString &path, MString &dirname, MString &basename, MString &frame, MTime &t, MString &ext);
+   unsigned long fillCacheFiles(const MString &path);
+   unsigned long fillCacheFiles(const MString &dirname, const MString &basename, const MString &ext);
+   
    /*
    std::string m_filename;
    bool m_isFileOpened;

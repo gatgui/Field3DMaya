@@ -144,6 +144,192 @@ Field3dCacheFormat::~Field3dCacheFormat()
   }
 }
 
+bool Field3dCacheFormat::identifyPath(const MString &path, MString &dirname, MString &basename, MString &frame, MTime &t, MString &ext)
+{
+  int idx, idx0, idx1;
+  
+  #ifdef _WIN32
+  idx0 = path.rindexW('\\');
+  idx1 = path.rindexW('/');
+  idx = (idx0 > idx1 ? idx0 : idx1);
+  #else
+  idx = path.rindexW('/');
+  #endif
+    
+  if (idx == -1)
+  {
+      dirname = "";
+      basename = path;
+  }
+  else
+  {
+      dirname = path.substringW(0, idx-1);
+      basename = path.substringW(idx+1, path.length());
+  }
+  
+  idx = basename.rindexW('.');
+  if (idx == -1)
+  {
+      ext = "";
+  }
+  else
+  {
+      ext = basename.substringW(idx+1, basename.length());
+      basename = basename.substringW(0, idx-1);
+  }
+  
+  if (ext != "f3d")
+  {
+    return false;
+  }
+  
+  bool timeFound = false;
+  int fval = 0;
+  double tval = 0.0;
+  
+  // search for .frame.subfrane pattern
+  
+  idx0 = basename.rindexW(".");
+  
+  if (idx0 != -1)
+  {
+    MString tmp0 = basename.substringW(idx0+1, basename.length());
+    
+    if (sscanf(tmp0.asChar(), "%d", &fval) == 1)
+    {
+      basename = basename.substringW(0, idx0-1);
+      
+      idx1 = basename.rindexW(".");
+      
+      if (idx1 != -1)
+      {
+        MString tmp1 = basename.substringW(idx1+1, basename.length());
+        
+        if (sscanf(tmp1.asChar(), "%d", &fval) == 1)
+        {
+          // basename.<frame>.<subframe>.f3d
+          basename = basename.substringW(0, idx1-1);
+          
+          tval = 0.0;
+          if (sscanf((tmp1 + "." + tmp0).asChar(), "%lf", &tval) == 1)
+          {
+            t.setValue(tval);
+            frame = tmp1 + "." + tmp0;
+            timeFound = true;
+          }
+        }
+        else
+        {
+          t.setValue(double(fval));
+          frame = tmp0;
+          timeFound = true;
+        }
+      }
+      else
+      {
+        t.setValue(double(fval));
+        frame = tmp0;
+        timeFound = true;
+      }
+    }
+  }
+  
+  if (!timeFound)
+  {
+    // search for FrameXXTickYY pattern
+    idx0 = basename.indexW("Frame");
+    
+    if (idx0 != -1)
+    {
+      MString tmp = basename.substringW(idx0, basename.length());
+      
+      idx1 = tmp.indexW("Tick");
+      
+      if (idx1 != -1)
+      {
+        int ticks = 0;
+        
+        if (sscanf(tmp.asChar(), "Frame%dTick%d", &fval, &ticks) == 2)
+        {
+          basename = basename.substringW(0, idx0-1);
+          t.setValue(double(fval) + ticks * MTime(1.0, MTime::k6000FPS).asUnits(MTime::uiUnit()));
+          frame = tmp;
+          timeFound = true;
+        }
+      }
+      else
+      {
+        if (sscanf(tmp.asChar(), "Frame%d", &fval) == 1)
+        {
+          basename = basename.substringW(0, idx0-1);
+          t.setValue(double(fval));
+          frame = tmp;
+          timeFound = true;
+        }
+      }
+    }
+  }
+  
+  if (timeFound)
+  {
+    MGlobal::displayInfo("Field3dCacheFormat::identifyPath: \"" + path + "\" -> dirname=" + dirname + ", basename=" + basename + ", frame=" + frame + ", ext=" + ext + ", time=" + t.value());
+  }
+  
+  return timeFound;
+}
+
+unsigned long Field3dCacheFormat::fillCacheFiles(const MString &path)
+{
+  MString dirname, basename, frame, ext;
+  MTime t;
+  
+  identifyPath(path, dirname, basename, frame, t, ext);
+  return fillCacheFiles(dirname, basename, ext);
+}
+
+unsigned long Field3dCacheFormat::fillCacheFiles(const MString &dirname, const MString &basename, const MString &ext)
+{
+  MStringArray tmp;
+
+  std::string dn = dirname.asChar();
+  if (dn.length() > 0)
+  {
+    char lc = dn[dn.length()-1];
+    
+    #ifdef _WIN32
+    if (lc != '\\' && lc != '/')
+    #else
+    if (lc != '/')
+    #endif
+    {
+      dn.push_back('/');
+    }
+  }
+  else
+  {
+    dn = "./";
+  }
+  
+  MString mdn = dn.c_str();
+  
+  MGlobal::executeCommand("getFileList -folder \"" + mdn + "\" -filespec \"" + basename + "*." + ext + "\"", tmp);
+  
+  m_cacheFiles.clear();
+  
+  MString _dn, _bn, _fn, _e;
+  MTime t;
+  
+  for (unsigned long i=0; i<tmp.length(); ++i)
+  {
+    if (identifyPath(tmp[i], _dn, _bn, _fn, t, _e))
+    {
+        m_cacheFiles[t].path = mdn + tmp[i];
+    }
+  }
+      
+  return (unsigned long) m_cacheFiles.size();
+}
+
 MStatus Field3dCacheFormat::open(const MString &fileName, FileAccessMode mode)
 {
   MGlobal::displayInfo("f3dCache::open \"" + fileName + "\"");
@@ -153,6 +339,8 @@ MStatus Field3dCacheFormat::open(const MString &fileName, FileAccessMode mode)
   if (mode == kRead || mode == kReadWrite)
   {
     MGlobal::displayInfo("  For reading");
+    
+    unsigned long n = fillCacheFiles(fileName);
   }
   
   if (mode == kWrite || mode == kReadWrite)
@@ -623,6 +811,8 @@ MStatus Field3dCacheFormat::readChannelName(MString &name)
 
 bool Field3dCacheFormat::handlesDescription()
 {
+  MGlobal::displayInfo(MString("f3dCache::handlesDescription: ") + (m_mode == kWrite ? "false" : "true"));
+  
   if (m_mode == kWrite)
   {
     // leave it to maya
@@ -637,6 +827,7 @@ bool Field3dCacheFormat::handlesDescription()
 MStatus Field3dCacheFormat::readDescription(MCacheFormatDescription &description, const MString &descriptionFileLocation, const MString &baseFileName)
 {
   MGlobal::displayInfo("f3dCache::readDescription \"" + descriptionFileLocation + "\", \"" + baseFileName + "\"");
+  
   return MPxCacheFormat::readDescription(description, descriptionFileLocation, baseFileName);
 }
 
