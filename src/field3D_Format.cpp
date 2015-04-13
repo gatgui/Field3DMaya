@@ -358,12 +358,14 @@ MStatus Field3dCacheFormat::open(const MString &fileName, FileAccessMode mode)
     if (curMode == (FileAccessMode)-1 || inFilename != m_inFilename)
     {
       fillCacheFiles(fileName);
-      m_curCacheFile = m_cacheFiles.end();
+      
+      m_inFilename = inFilename;
       // ??? Want to read that from .xml <extra> tags
       m_remapChannels.clear();
       
-      m_inFilename = inFilename;
+      m_curCacheFile = m_cacheFiles.end();
       
+      m_inFluidName = "";
       m_inPartition = "";
       m_inChannel = "";
     }
@@ -384,12 +386,13 @@ MStatus Field3dCacheFormat::open(const MString &fileName, FileAccessMode mode)
         
         it->second.fields.clear();
         
+        m_inFluidName = "";
         m_inPartition = "";
         m_inChannel = "";
       }
       
       m_inFile = new Field3DInputFile();
-    
+      
       // open the file
       if (!m_inFile->open(it->second.path.asChar()))
       {
@@ -401,11 +404,13 @@ MStatus Field3dCacheFormat::open(const MString &fileName, FileAccessMode mode)
       }
       
       m_curCacheFile = it;
-      
       m_curField = it->second.fields.end();
-      
-      // const Field3D::V3f er(-999.999,-999.999,-999.999);
-      // Field3D::V3f off = m_inFile->metadata().vecFloatMetadata("Offset", er);
+      m_nextField = it->second.fields.end();
+    }
+    else
+    {
+      // same cache file, reset field iterators?
+      // -> this should be the role of findChannelName/readChannelName...
     }
   }
   
@@ -792,16 +797,13 @@ void Field3dCacheFormat::endWriteChunk()
 
 MStatus Field3dCacheFormat::readHeader()
 {
-  MGlobal::displayInfo("f3dCache::readHeader");
+  //MGlobal::displayInfo("f3dCache::readHeader");
   return MS::kFailure;
 }
 
 MStatus Field3dCacheFormat::beginReadChunk()
 {
-  MGlobal::displayInfo("f3dCache::beginReadChunk");
-  // Check for valid pointer?
-  // Read current file fields
-  
+  //MGlobal::displayInfo("f3dCache::beginReadChunk");
   return MS::kSuccess;
 }
 
@@ -819,7 +821,6 @@ MStatus Field3dCacheFormat::findChannelName(const MString &name)
   // call in turn for each fields
   
   std::string fluidName = extractFluidName(name);
-  
   std::string channel = extractChannelName(name);
   std::string partition = partitionName(fluidName);
   
@@ -897,15 +898,19 @@ MStatus Field3dCacheFormat::findChannelName(const MString &name)
     channel = rit->second;
   }
   
+  m_inFluidName = fluidName;
   m_inPartition = partition;
   m_inChannel = channel;
   
   if (channel == "resolution" || channel == "offset")
   {
+    m_curField = cacheFile.fields.end();
+    m_nextField = cacheFile.fields.begin();
     return MS::kSuccess;
   }
   
-  m_curField = cacheFile.fields.find(channel);
+  m_nextField = cacheFile.fields.find(channel);
+  m_curField = m_nextField++;
   
   return (m_curField != cacheFile.fields.end() ? MS::kSuccess : MS::kFailure);
 }
@@ -913,12 +918,30 @@ MStatus Field3dCacheFormat::findChannelName(const MString &name)
 MStatus Field3dCacheFormat::readChannelName(MString &name)
 {
   MGlobal::displayInfo("f3dCache::readChannelName");
-  return MS::kFailure;
+  
+  if (m_curCacheFile == m_cacheFiles.end())
+  {
+    return MS::kFailure;
+  }
+  
+  CacheEntry &cacheFile = m_curCacheFile->second;
+  
+  if (m_nextField != cacheFile.fields.end())
+  {
+    name = (m_inFluidName + "_" + m_nextField->first).c_str();
+    m_curField = m_nextField++;
+    MGlobal::displayInfo("  => " + name);
+    return MS::kSuccess;
+  }
+  else
+  {
+    return MS::kFailure;
+  }
 }
 
 void Field3dCacheFormat::endReadChunk()
 {
-  MGlobal::displayInfo("f3dCache::endReadChunk");
+  //MGlobal::displayInfo("f3dCache::endReadChunk");
 }
 
 MStatus Field3dCacheFormat::readTime(MTime &time)
@@ -954,6 +977,8 @@ unsigned Field3dCacheFormat::readArraySize()
     }
     else if (m_curField != m_curCacheFile->second.fields.end())
     {
+      MGlobal::displayInfo(MString("  => ") + m_curField->first.c_str());
+      
       // return field resolution
       Field3DTools::Fld &fld = m_curField->second;
       

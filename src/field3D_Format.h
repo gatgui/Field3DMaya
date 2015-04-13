@@ -182,6 +182,7 @@ private:
    
    std::string m_inFilename;
    Field3DInputFile *m_inFile;
+   std::string m_inFluidName;
    std::string m_inPartition;
    std::string m_inChannel;
    
@@ -206,6 +207,7 @@ private:
    std::map<MTime, CacheEntry> m_cacheFiles;
    std::map<MTime, CacheEntry>::iterator m_curCacheFile;
    std::map<std::string, Field3DTools::Fld>::iterator m_curField;
+   std::map<std::string, Field3DTools::Fld>::iterator m_nextField;
    
    bool identifyPath(const MString &path, MString &dirname, MString &basename, MString &frame, MTime &t, MString &ext);
    unsigned long fillCacheFiles(const MString &path);
