@@ -87,8 +87,8 @@ bool getFieldsResolution(Field3D::Field3DInputFile *inFile, const std::string &p
   // Note: don't need to check for half/float/double, readProxyLayer actually ignores the base type
   
   // loop through scalars fields
-  typename Field3D::EmptyField<Field3D::half>::Vec scalarfields = readProxyScalarLayers<Field3D::half>(inFile, partition, name);
-  typename Field3D::EmptyField<Field3D::half>::Vec::const_iterator its = scalarfields.begin();
+  Field3D::EmptyField<Field3D::half>::Vec scalarfields = readProxyScalarLayers<Field3D::half>(inFile, partition, name);
+  Field3D::EmptyField<Field3D::half>::Vec::const_iterator its = scalarfields.begin();
   
   for (; its != scalarfields.end(); ++its)
   {
@@ -99,8 +99,8 @@ bool getFieldsResolution(Field3D::Field3DInputFile *inFile, const std::string &p
   }
 
   // loop through vector fields
-  typename Field3D::EmptyField<FIELD3D_VEC3_T<Field3D::half> >::Vec vectorfields = readProxyVectorLayers<Field3D::half>(inFile, partition, name);
-  typename Field3D::EmptyField<FIELD3D_VEC3_T<Field3D::half> >::Vec::const_iterator itv = vectorfields.begin();
+  Field3D::EmptyField<FIELD3D_VEC3_T<Field3D::half> >::Vec vectorfields = readProxyVectorLayers<Field3D::half>(inFile, partition, name);
+  Field3D::EmptyField<FIELD3D_VEC3_T<Field3D::half> >::Vec::const_iterator itv = vectorfields.begin();
   
   for (; itv != vectorfields.end(); ++itv)
   {

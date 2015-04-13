@@ -197,6 +197,9 @@ private:
    {
       MString path;
       std::map<std::string, Field3DTools::Fld> fields;
+      Field3D::V3i resolution;
+      Field3D::V3f offset;
+      Field3D::V3f dimension;
    };
    
    std::map<std::string, std::string> m_remapChannels;

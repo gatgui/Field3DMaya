@@ -302,15 +302,14 @@ typename Field3D::Field<FIELD3D_VEC3_T<Data_T> >::Vec readVectorLayers(Field3D::
 
 // ---------------------  Read Field3d field into raw arrays
 
-template <class FieldType, typename MayaArray>
-bool readScalarField(typename FieldType::Ptr field,
-                     const std::string &fluidName,
-                     const std::string &fieldName,
+template <typename ImportType, typename MayaArray>
+bool readScalarField(typename Field3D::Field<ImportType>::Ptr field,
                      MayaArray &data)
 {
+   typedef typename Field3D::Field<ImportType> FieldType;
+   
    if (!field)
    {
-      ERROR( std::string("Failed to read ") + fieldName + " : Dynamic downcasting failed ");
       return false;
    }
 
@@ -343,15 +342,14 @@ bool readScalarField(typename FieldType::Ptr field,
 }
 
 
-template <class FieldType, typename MayaArray>
-bool readVectorField(typename FieldType::Ptr field,
-                     const std::string &fluidName,
-                     const std::string &fieldName,
+template <typename ImportType, typename MayaArray>
+bool readVectorField(typename Field3D::Field<FIELD3D_VEC3_T<ImportType> >::Ptr field,
                      MayaArray &data)
 {
+   typedef typename Field3D::Field<FIELD3D_VEC3_T<ImportType> > FieldType;
+   
    if (!field)
    {
-      ERROR( std::string("Failed to read ") + fieldName + " : Dynamic downcasting failed ");
       return false;
    }
 
@@ -384,45 +382,35 @@ bool readVectorField(typename FieldType::Ptr field,
    {
       for (; it != itend; ++it)
       {
-         // size_t off = 3 * (it.x + resolution[0] * (it.y + resolution[1] * it.z));
-         // 
-         // data[0+off] = it->x;
-         // data[1+off] = it->y;
          size_t off = it.x + resolution[0] * (it.y + resolution[1] * it.z);
          
-         data[xoff + off] = it->x;
-         data[yoff + off] = it->y;
+         data[xoff + off] = (*it).x;
+         data[yoff + off] = (*it).y;
       }
    }
    else
    {
       for (; it != itend; ++it)
       {
-         // size_t off = 3 * (it.x + resolution[0] * (it.y + resolution[1] * it.z));
-         // 
-         // data[0+off] = it->x;
-         // data[1+off] = it->y;
-         // data[2+off] = it->z;
          size_t off = it.x + resolution[0] * (it.y + resolution[1] * it.z);
          
-         data[xoff + off] = it->x;
-         data[yoff + off] = it->y;
-         data[zoff + off] = it->z;
+         data[xoff + off] = (*it).x;
+         data[yoff + off] = (*it).y;
+         data[zoff + off] = (*it).z;
       }
    }
    
    return true;
 }
 
-template <class ImportType, typename MayaArray>
+template <typename ImportType, typename MayaArray>
 bool readMACField(typename Field3D::MACField<FIELD3D_VEC3_T<ImportType> >::Ptr field,
-                  const std::string &fluidName,
-                  const std::string &fieldName,
                   MayaArray &data)
 {
+   typedef Field3D::MACField<FIELD3D_VEC3_T<ImportType> > FieldType;
+   
    if (!field)
    {
-      ERROR( std::string("Failed to read ") + fieldName + " : Dynamic downcasting failed  ");
       return false;
    }
 
@@ -470,8 +458,8 @@ bool readMACField(typename Field3D::MACField<FIELD3D_VEC3_T<ImportType> >::Ptr f
          break;
       }
 
-      typename Field3D::MACField<FIELD3D_VEC3_T<ImportType> >::mac_comp_iterator it = field->begin_comp(compo[cp]);
-      typename Field3D::MACField<FIELD3D_VEC3_T<ImportType> >::mac_comp_iterator itend = field->end_comp(compo[cp]);
+      typename FieldType::mac_comp_iterator it = field->begin_comp(compo[cp]);
+      typename FieldType::mac_comp_iterator itend = field->end_comp(compo[cp]);
       
       for ( ; it != itend; ++it)
       {
@@ -483,46 +471,41 @@ bool readMACField(typename Field3D::MACField<FIELD3D_VEC3_T<ImportType> >::Ptr f
    return true;
 }
 
-template <class FieldType, typename MayaArray>
-bool readScalarField(Field3D::Field3DInputFile *in,
-                     const std::string &fluidName,
-                     const std::string &fieldName,
-                     MayaArray &data)
+template <typename ImportType, typename MayaArray>
+bool readScalarFieldFromFile(Field3D::Field3DInputFile *in,
+                             const std::string &fluidName,
+                             const std::string &fieldName,
+                             MayaArray &data)
 {
-   typedef typename FieldType::value_type ImportType;
-
-   typename Field3D::Field<ImportType >::Vec sl = readScalarLayers<ImportType>(in, fluidName, fieldName);
-   typename FieldType::Ptr field = Field3D::field_dynamic_cast< FieldType >(sl[0]);
+   typename Field3D::Field<ImportType>::Vec sl = readScalarLayers<ImportType>(in, fluidName, fieldName);
    
-   return readScalarField<FieldType, MayaArray>(field, fluidName, fieldName, data);
+   return readScalarField(sl[0], data);
 }
 
 
-template <class FieldType, typename MayaArray>
-bool readVectorField(Field3D::Field3DInputFile *in,
-                     const std::string &fluidName,
-                     const std::string &fieldName,
-                     MayaArray &data)
+template <typename ImportType, typename MayaArray>
+bool readVectorFieldFromFile(Field3D::Field3DInputFile *in,
+                             const std::string &fluidName,
+                             const std::string &fieldName,
+                             MayaArray &data)
 {
-   typedef typename FieldType::value_type ImportType;
-   typedef typename ImportType::BaseType DataType;
-
-   typename Field3D::Field<ImportType>::Vec sl = readVectorLayers<DataType>(in, fluidName, fieldName)       ;
-   typename FieldType::Ptr field = Field3D::field_dynamic_cast< FieldType >(sl[0]) ;
+   typename Field3D::Field<FIELD3D_VEC3_T<ImportType> >::Vec sl = readVectorLayers<ImportType>(in, fluidName, fieldName)       ;
    
-   return readVectorField<FieldType, MayaArray>(field, fluidName, fieldName, data);
+   return readVectorField(sl[0], data);
 }
 
-template <class ImportType, typename MayaArray>
-bool readMACField(Field3D::Field3DInputFile *in,
-                  const std::string &fluidName,
-                  const std::string &fieldName,
-                  MayaArray &data)
+template <typename ImportType, typename MayaArray>
+bool readMACFieldFromFile(Field3D::Field3DInputFile *in,
+                             const std::string &fluidName,
+                             const std::string &fieldName,
+                             MayaArray &data)
 {
-   typename Field3D::Field<FIELD3D_VEC3_T<ImportType> >::Vec sl = readVectorLayers<ImportType>(in, fluidName, fieldName);
-   typename Field3D::MACField<FIELD3D_VEC3_T<ImportType> >::Ptr field = Field3D::field_dynamic_cast< Field3D::MACField<FIELD3D_VEC3_T<ImportType> > >(sl[0]);
+   typedef typename Field3D::Field<FIELD3D_VEC3_T<ImportType> > FieldType;
+   typedef typename Field3D::MACField<FIELD3D_VEC3_T<ImportType> > MACFieldType;
    
-   return readMACField<ImportType, MayaArray>(field, fluidName, fieldName, data);
+   typename FieldType::Vec sl = readVectorLayers<ImportType>(in, fluidName, fieldName);
+   
+   return readMACField(Field3D::field_dynamic_cast<MACFieldType>(sl[0]), data);
 }
 
 
