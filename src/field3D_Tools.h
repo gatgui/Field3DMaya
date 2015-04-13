@@ -98,13 +98,13 @@ bool getFieldValueType(Field3D::Field3DInputFile *inFile, const std::string &par
 
 template <typename Data_T>
 void setFieldProperties(Field3D::ResizableField<Data_T> &field,
-                        const std::string name,
-                        const std::string attribute,
+                        const std::string &name,
+                        const std::string &attribute,
                         double transform[4][4])
 {
    // name, attribute
-   field.name = name.c_str();
-   field.attribute = attribute.c_str();
+   field.name = name;
+   field.attribute = attribute;
 
    // mapping
    Field3D::MatrixFieldMapping::Ptr mapping(new Field3D::MatrixFieldMapping);
@@ -397,36 +397,36 @@ bool readMACField(Field3D::Field3DInputFile *in,
 
 // ---------------------  Write raw arrays into Field3D files
 
+/*
 typedef bool (*WriteScalarFieldFunc)(Field3D::Field3DOutputFile *out,
-                                     const char *fluidName,
+                                     const std::string &fluidName,
                                      const char *fieldName,
                                      unsigned int res[3],
                                      double transform[4][4],
                                      const float *data);
 
 typedef bool (*WriteVectorFieldFunc)(Field3D::Field3DOutputFile *out,
-                                     const char *fluidName,
-                                     const char *fieldName,
+                                     const std::string &fluidName,
+                                     const std::string &fieldName,
                                      unsigned int res[3],
                                      double transform[4][4],
                                      const float *data0,
                                      const float *data1,
                                      const float *data2);
+*/
 
-template <typename ExportType>
+typedef void writeMetadataFunc(Field3D::FieldRes::Ptr field, void*);
+
+template <typename ExportType, typename MayaArray>
 bool writeDenseScalarField(Field3D::Field3DOutputFile *out,
-                           const char *fluidName,
-                           const char *fieldName,
+                           const std::string &fluidName,
+                           const std::string &fieldName,
                            unsigned int res[3],
                            double transform[4][4],
-                           const float *data)
+                           const MayaArray &data,
+                           writeMetadataFunc writeMetadata=0,
+                           void *writeMetadataUser=0)
 {
-   if (data == NULL)
-   {
-      ERROR("Array is NULL");
-      return false;
-   }
-
    // field declaration
    typename Field3D::DenseField<ExportType>::Ptr field = new Field3D::DenseField<ExportType>();
 
@@ -449,6 +449,11 @@ bool writeDenseScalarField(Field3D::Field3DOutputFile *out,
          }
       }
    }
+   
+   if (writeMetadata)
+   {
+      writeMetadata(field, writeMetadataUser);
+   }
 
    // write it onto disk
    if (!out->writeScalarLayer<ExportType>(field))
@@ -460,21 +465,16 @@ bool writeDenseScalarField(Field3D::Field3DOutputFile *out,
    return true;
 }
 
-template <typename ExportType>
+template <typename ExportType, typename MayaArray>
 bool writeSparseScalarField(Field3D::Field3DOutputFile *out,
-                            const char *fluidName,
-                            const char *fieldName,
+                            const std::string &fluidName,
+                            const std::string &fieldName,
                             unsigned int res[3],
                             double transform[4][4],
-                            const float *data)
+                            const MayaArray &data,
+                            writeMetadataFunc writeMetadata=0,
+                            void *writeMetadataUser=0)
 {
-   // check
-   if (data == NULL)
-   {
-      ERROR("Array is NULL");
-      return false;
-   }
-
    // field declaration
    typename Field3D::SparseField<ExportType>::Ptr field = new Field3D::SparseField<ExportType>();
 
@@ -490,17 +490,18 @@ bool writeSparseScalarField(Field3D::Field3DOutputFile *out,
       {
          for (unsigned int i=0; i<res[0]; ++i)
          {
-            // TODO : check conversion
-            ExportType val= (ExportType) data[i + res[0] * (j + res[1] * k)];
+            ExportType val = (ExportType) data[i + res[0] * (j + res[1] * k)];
             
-            // if (val > SPARSE_THRESHOLD)
-            {
-               field->fastLValue(i, j, k) = val;
-            }
+            field->fastLValue(i, j, k) = val;
          }
       }
    }
-
+   
+   if (writeMetadata)
+   {
+      writeMetadata(field, writeMetadataUser);
+   }
+   
    // write it onto disk
    if (!out->writeScalarLayer<ExportType>(field))
    {
@@ -511,29 +512,35 @@ bool writeSparseScalarField(Field3D::Field3DOutputFile *out,
    return true;
 }
 
-template <typename ExportType>
-extern bool writeDenseVectorField(Field3D::Field3DOutputFile *out,
-                                  const char *fluidName,
-                                  const char *fieldName,
-                                  unsigned int res[3],
-                                  double transform[4][4],
-                                  const float *data0,
-                                  const float *data1,
-                                  const float *data2)
+template <typename ExportType, typename MayaArray>
+bool writeDenseVectorField(Field3D::Field3DOutputFile *out,
+                           const std::string &fluidName,
+                           const std::string &fieldName,
+                           unsigned int res[3],
+                           double transform[4][4],
+                           const MayaArray &data,
+                           writeMetadataFunc writeMetadata=0,
+                           void *writeMetadataUser=0)
 {
-   // check
-   if (data0 == NULL || data1 == NULL)
+   // field declaration
+   typename Field3D::DenseField<FIELD3D_VEC3_T<ExportType> >::Ptr field = new Field3D::DenseField<FIELD3D_VEC3_T<ExportType> >();
+   
+   unsigned int nvoxels = res[0] * res[1] * res[2];
+   
+   if (data.length() < 2 * nvoxels)
    {
-      ERROR("Arrays are NULL");
       return false;
    }
    
-   // field declaration
-   typename Field3D::DenseField<FIELD3D_VEC3_T<ExportType> >::Ptr field = new Field3D::DenseField<FIELD3D_VEC3_T<ExportType> >();
-
+   bool is3D = (data.length() >= 3 * nvoxels ? true : false);
+   
+   unsigned int xbase = 0;
+   unsigned int ybase = nvoxels;
+   unsigned int zbase = (is3D ? 2 * nvoxels : 0);
+   
    // properties
    Field3DTools::setFieldProperties(*field.get(), fluidName, fieldName, transform);
-
+   
    // copy channel into the vector field
    field->setSize(Field3D::V3i(res[0], res[1], res[2]));
    
@@ -546,13 +553,18 @@ extern bool writeDenseVectorField(Field3D::Field3DOutputFile *out,
             size_t off = i + res[0] * (j + res[1] * k);
             
             // TODO : check conversion
-            ExportType a = (ExportType) data0[off];
-            ExportType b = (ExportType) data1[off];
-            ExportType c = (ExportType) (data2 ? data2[off] : 0.0f);
+            ExportType a = (ExportType) data[xbase + off];
+            ExportType b = (ExportType) data[ybase + off];
+            ExportType c = (ExportType) (is3D ? data[zbase + off] : 0.0f);
             
             field->fastLValue(i, j, k) = Imath::Vec3<ExportType>(a, b, c);
          }
       }
+   }
+   
+   if (writeMetadata)
+   {
+      writeMetadata(field, writeMetadataUser);
    }
 
    // write it onto disk
@@ -565,25 +577,32 @@ extern bool writeDenseVectorField(Field3D::Field3DOutputFile *out,
    return true;
 }
 
-template <typename ExportType>
-extern bool writeSparseVectorField(Field3D::Field3DOutputFile *out,
-                                   const char *fluidName,
-                                   const char *fieldName,
-                                   unsigned int res[3],
-                                   double transform[4][4],
-                                   const float *data0,
-                                   const float *data1,
-                                   const float *data2)
+template <typename ExportType, typename MayaArray>
+bool writeSparseVectorField(Field3D::Field3DOutputFile *out,
+                            const std::string &fluidName,
+                            const std::string &fieldName,
+                            unsigned int res[3],
+                            double transform[4][4],
+                            const MayaArray &data,
+                            writeMetadataFunc writeMetadata=0,
+                            void *writeMetadataUser=0)
 {
-   // check
-   if (data0 == NULL || data1 == NULL)
+   // field declaration
+   typename Field3D::SparseField<FIELD3D_VEC3_T<ExportType> >::Ptr field = new Field3D::SparseField<FIELD3D_VEC3_T<ExportType> >();
+   
+   // setup X, Y and Z field base offsets
+   unsigned int nvoxels = res[0] * res[1] * res[2];
+   
+   if (data.length() < 2 * nvoxels)
    {
-      ERROR("Arrays are NULL");
       return false;
    }
    
-   // field declaration
-   typename Field3D::SparseField<FIELD3D_VEC3_T<ExportType> >::Ptr field = new Field3D::SparseField<FIELD3D_VEC3_T<ExportType> >();
+   bool is3D = (data.length() >= 3 * nvoxels ? true : false);
+   
+   unsigned int xbase = 0;
+   unsigned int ybase = nvoxels;
+   unsigned int zbase = (is3D ? 2 * nvoxels : 0);
    
    // properties
    Field3DTools::setFieldProperties(*field, fluidName, fieldName, transform);
@@ -600,17 +619,18 @@ extern bool writeSparseVectorField(Field3D::Field3DOutputFile *out,
             size_t off = i + res[0] * (j + res[1] * k);
             
             // TODO : check conversion
-            ExportType a = (ExportType) data0[off];
-            ExportType b = (ExportType) data1[off];
-            ExportType c = (ExportType) (data2 ? data2[off] : 0.0f);
+            ExportType a = (ExportType) data[xbase + off];
+            ExportType b = (ExportType) data[ybase + off];
+            ExportType c = (ExportType) (is3D ? data[zbase + off] : 0.0f);
 
-            // it is not very clear how to use a threshold for a vector field
-            //if (a * a + b * b + c * c > SPARSE_THRESHOLD)
-            {
-               field->fastLValue(i, j, k) = Imath::Vec3<ExportType>(a, b, c);
-            }
+            field->fastLValue(i, j, k) = Imath::Vec3<ExportType>(a, b, c);
          }
       }
+   }
+   
+   if (writeMetadata)
+   {
+      writeMetadata(field, writeMetadataUser);
    }
    
    // write it onto disk
@@ -623,26 +643,35 @@ extern bool writeSparseVectorField(Field3D::Field3DOutputFile *out,
    return true;
 }
 
-template <typename ExportType>
-extern bool writeMACVectorField(Field3D::Field3DOutputFile *out,
-                                const char *fluidName,
-                                const char *fieldName,
-                                unsigned int res[3],
-                                double transform[4][4],
-                                const float *vx,
-                                const float *vy,
-                                const float *vz)
+template <typename ExportType, typename MayaArray>
+bool writeMACVectorField(Field3D::Field3DOutputFile *out,
+                         const std::string &fluidName,
+                         const std::string &fieldName,
+                         unsigned int res[3],
+                         double transform[4][4],
+                         const MayaArray &v,
+                         writeMetadataFunc writeMetadata=0,
+                         void *writeMetadataUser=0)
 {
-   // check
-   if (vx == NULL || vy == NULL)
-   {
-      ERROR("Arrays are NULL");
-      return false;
-   }
-
    // field declaration
    typename Field3D::MACField<FIELD3D_VEC3_T<ExportType> >::Ptr field = new Field3D::MACField<FIELD3D_VEC3_T<ExportType> >();
-
+   
+   // setup X, Y and Z field base offsets
+   unsigned int nvoxelsx = (res[0] + 1) * res[1] * res[2];
+   unsigned int nvoxelsy = res[0] * (res[1] + 1) * res[2];
+   unsigned int nvoxelsz = res[0] * res[1] * (res[2] + 1);
+   
+   if (v.length() < (nvoxelsx + nvoxelsy))
+   {
+      return false;
+   }
+   
+   bool is3D = (v.length() >= (nvoxelsx + nvoxelsy + nvoxelsz) ? true : false);
+   
+   unsigned int xbase = 0;
+   unsigned int ybase = nvoxelsx;
+   unsigned int zbase = (is3D ? nvoxelsx + nvoxelsy: 0);
+   
    // properties
    Field3DTools::setFieldProperties(*field, fluidName, fieldName, transform);
 
@@ -659,9 +688,9 @@ extern bool writeMACVectorField(Field3D::Field3DOutputFile *out,
          for (z = 0; z < res[2]; ++z)
          {
             // TODO : check conversion
-            field->u(x, y, z) = (ExportType) vx[x + (res[0] + 1) * (y + res[1] * z)];
-            field->v(x, y, z) = (ExportType) vy[x + res[0] * (y + (res[1] + 1) * z)];
-            field->w(x, y, z) = (ExportType) (vz ? vz[x + res[0] * (y + res[1] * z)] : 0.0f);
+            field->u(x, y, z) = (ExportType) v[xbase + x + (res[0] + 1) * (y + res[1] * z)];
+            field->v(x, y, z) = (ExportType) v[ybase + x + res[0] * (y + (res[1] + 1) * z)];
+            field->w(x, y, z) = (ExportType) (is3D ? v[zbase + x + res[0] * (y + res[1] * z)] : 0.0f);
          }
       }
    }
@@ -672,7 +701,7 @@ extern bool writeMACVectorField(Field3D::Field3DOutputFile *out,
    {
       for (z = 0; z < res[2]; ++z)
       {
-         field->u(res[0], y, z) = (ExportType) vx[x + (res[0] + 1) * (y + res[1] * z)];
+         field->u(res[0], y, z) = (ExportType) v[xbase + x + (res[0] + 1) * (y + res[1] * z)];
       }
    }
 
@@ -682,7 +711,7 @@ extern bool writeMACVectorField(Field3D::Field3DOutputFile *out,
    {
       for (z = 0; z < res[2]; ++z)
       {
-         field->v(x, res[1], z) = (ExportType) vy[x + res[0] * (y + (res[1] + 1) * z)];
+         field->v(x, res[1], z) = (ExportType) v[ybase + x + res[0] * (y + (res[1] + 1) * z)];
       }
    }
    
@@ -692,8 +721,13 @@ extern bool writeMACVectorField(Field3D::Field3DOutputFile *out,
    {
       for (y = 0; y < res[1]; ++y)
       {
-         field->w(x, y, res[2]) = (ExportType) (vz ? vz[x + res[0] * (y + res[1] * z)] : 0.0f);
+         field->w(x, y, res[2]) = (ExportType) (is3D ? v[zbase + x + res[0] * (y + res[1] * z)] : 0.0f);
       }
+   }
+   
+   if (writeMetadata)
+   {
+      writeMetadata(field, writeMetadataUser);
    }
 
    // write it onto disk

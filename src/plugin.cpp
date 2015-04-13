@@ -43,8 +43,10 @@ MStatus initializePlugin( MObject obj )
 
   CHECK_MSTATUS_AND_RETURN_IT( plugin.registerCacheFormat("f3d_dense_half"  , Field3dCacheFormat::DHCreator) );
   CHECK_MSTATUS_AND_RETURN_IT( plugin.registerCacheFormat("f3d_dense_float" , Field3dCacheFormat::DFCreator) );
+  CHECK_MSTATUS_AND_RETURN_IT( plugin.registerCacheFormat("f3d_dense_double" , Field3dCacheFormat::DDCreator) );
   CHECK_MSTATUS_AND_RETURN_IT( plugin.registerCacheFormat("f3d_sparse_half" , Field3dCacheFormat::SHCreator) );
   CHECK_MSTATUS_AND_RETURN_IT( plugin.registerCacheFormat("f3d_sparse_float", Field3dCacheFormat::SFCreator) );
+  CHECK_MSTATUS_AND_RETURN_IT( plugin.registerCacheFormat("f3d_sparse_double", Field3dCacheFormat::SDCreator) );
   CHECK_MSTATUS_AND_RETURN_IT( plugin.registerCommand("exportF3d", exportF3d::creator, exportF3d::newSyntax) );
   
   MStatus status = plugin.registerNode( "Field3DForceLoad",
@@ -118,10 +120,12 @@ MStatus uninitializePlugin( MObject obj )
     return status;
   }
   
-  CHECK_MSTATUS_AND_RETURN_IT( plugin.deregisterCacheFormat("f3d_dense_half"  ) );
-  CHECK_MSTATUS_AND_RETURN_IT( plugin.deregisterCacheFormat("f3d_dense_float" ) );
-  CHECK_MSTATUS_AND_RETURN_IT( plugin.deregisterCacheFormat("f3d_sparse_half" ) );
-  CHECK_MSTATUS_AND_RETURN_IT( plugin.deregisterCacheFormat("f3d_sparse_float") );
+  CHECK_MSTATUS_AND_RETURN_IT( plugin.deregisterCacheFormat("f3d_dense_half"   ) );
+  CHECK_MSTATUS_AND_RETURN_IT( plugin.deregisterCacheFormat("f3d_dense_float"  ) );
+  CHECK_MSTATUS_AND_RETURN_IT( plugin.deregisterCacheFormat("f3d_dense_double" ) );
+  CHECK_MSTATUS_AND_RETURN_IT( plugin.deregisterCacheFormat("f3d_sparse_half"  ) );
+  CHECK_MSTATUS_AND_RETURN_IT( plugin.deregisterCacheFormat("f3d_sparse_float" ) );
+  CHECK_MSTATUS_AND_RETURN_IT( plugin.deregisterCacheFormat("f3d_sparse_double") );
   CHECK_MSTATUS_AND_RETURN_IT( plugin.deregisterCommand("exportF3d") );
   
   return MStatus::kSuccess;

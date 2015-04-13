@@ -57,6 +57,7 @@
 #include <maya/MFloatArray.h>
 #include <maya/MIntArray.h>
 #include <maya/MVectorArray.h>
+#include <maya/MFnFluid.h>
 
 #include <Field3D/Field3DFile.h>
 #include <Field3D/MACField.h>
@@ -156,7 +157,6 @@ public:
    MStatus  findTime        ( MTime& time, MTime& foundTime);
    MStatus  readNextTime    ( MTime& foundTime);
    MStatus  rewind();
-   */
    
 private:
    
@@ -165,8 +165,27 @@ private:
    
    template <class T>  // T is MFloatArray or MDoubleArray
    MStatus readArray(T &array, unsigned arraySize);
+   */
+   
+   template <class T>
+   MStatus writeArray(T &array);
    
 private:
+   
+   Field3DTools::FieldTypeEnum m_fieldType;
+   Field3DTools::FieldDataTypeEnum m_dataType;
+   
+   FileAccessMode m_mode;
+   
+   Field3DInputFile *m_inFile;
+   
+   std::string m_outFilename;
+   Field3DOutputFile *m_outFile;
+   std::string m_outPartition;
+   std::string m_outChannel;
+   MFnFluid m_outFluid;
+   float m_outOffset[3];
+   
    
    struct CacheEntry
    {
@@ -197,12 +216,10 @@ private:
       Field3D::MACField<Field3D::V3d> mdField;
    };
    
-   std::map<MTime, CacheEntry> mCacheFiles;
-   std::map<MTime, CacheEntry>::iterator mCurCacheFile;
+   std::map<MTime, CacheEntry> m_cacheFiles;
+   std::map<MTime, CacheEntry>::iterator m_curCacheFile;
    
-   Field3DInputFile *m_inFile;
-   Field3DOutputFile *m_outFile;
-   
+   /*
    std::string m_filename;
    bool m_isFileOpened;
    MString m_currentName;
@@ -210,10 +227,10 @@ private:
    float m_offset[3];
    
    std::deque<std::string> m_nameStack;
+   */
    
    // export Type
-   Field3DTools::FieldTypeEnum m_fieldType;
-   Field3DTools::FieldDataTypeEnum m_dataType;
+   
 };
 
 #endif
