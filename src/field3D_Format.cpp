@@ -342,8 +342,6 @@ MStatus Field3dCacheFormat::writeArray(T &array)
   
   if (m_outChannel == "resolution" || m_outChannel == "offset" )
   {
-    // array size ?
-    MGlobal::displayInfo("'resolution' and 'offset' are implicit");
     return MS::kSuccess;
   }
   
@@ -625,8 +623,15 @@ MStatus Field3dCacheFormat::readChannelName(MString &name)
 
 bool Field3dCacheFormat::handlesDescription()
 {
-  MGlobal::displayInfo("f3dCache::handlesDescription");
-  return true;
+  if (m_mode == kWrite)
+  {
+    // leave it to maya
+    return false;
+  }
+  else
+  {
+    return true;
+  }
 }
 
 MStatus Field3dCacheFormat::readDescription(MCacheFormatDescription &description, const MString &descriptionFileLocation, const MString &baseFileName)
@@ -637,7 +642,6 @@ MStatus Field3dCacheFormat::readDescription(MCacheFormatDescription &description
 
 MStatus Field3dCacheFormat::writeDescription(const MCacheFormatDescription &description, const MString &descriptionFileLocation, const MString &baseFileName)
 {
-  MGlobal::displayInfo("f3dCache::writeDescription \"" + descriptionFileLocation + "\", \"" + baseFileName + "\"");
   return MPxCacheFormat::writeDescription(description, descriptionFileLocation, baseFileName);
 }
 
