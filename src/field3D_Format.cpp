@@ -861,6 +861,13 @@ void Field3dCacheFormat::initFields(const std::string &partition)
       m_inDimension *= scl;
    }
    
+   // add dummy fields for 'resolution' and 'offset'
+   Field3DTools::Fld dummyField;
+   dummyField.fieldType = Field3DTools::TypeUnsupported;
+   
+   m_inFields["resolution"] = dummyField;
+   m_inFields["offset"] = dummyField;
+   
    m_inCurField = m_inFields.end();
    m_inNextField = m_inFields.begin();
 }
@@ -904,22 +911,12 @@ MStatus Field3dCacheFormat::findChannelName(const MString &name)
    
    m_inChannel = channel;
    
-   if (channel == "resolution" || channel == "offset")
-   {
-      m_inCurField = m_inFields.end();
-      return MS::kSuccess;
-   }
-   else
-   {
-      m_inCurField = m_inFields.find(channel);
-      return (m_inCurField != m_inFields.end() ? MS::kSuccess : MS::kFailure);
-   }
+   m_inCurField = m_inFields.find(channel);
+   return (m_inCurField != m_inFields.end() ? MS::kSuccess : MS::kFailure);
 }
 
 MStatus Field3dCacheFormat::readChannelName(MString &name)
 {
-   MGlobal::displayInfo("f3dCache::readChannelName");
-   
    if (!m_inFile)
    {
       return MS::kFailure;
@@ -945,7 +942,8 @@ MStatus Field3dCacheFormat::readChannelName(MString &name)
       }
       
       name = (m_inFluidName + "_" + channel).c_str();
-      MGlobal::displayInfo("  => " + name);
+      
+      MGlobal::displayInfo("f3dCache::readChannelName \"" + name + "\"");
       
       return MS::kSuccess;
    }
@@ -983,17 +981,21 @@ MStatus Field3dCacheFormat::readNextTime(MTime &foundTime)
 
 unsigned Field3dCacheFormat::readArraySize()
 {
-   MGlobal::displayInfo("f3dCache::readArraySize");
+   std::ostringstream oss;
+   oss << "f3dCache::readArraySize";
+   
+   unsigned rv = 0;
    
    if (m_inFile)
    {
       if (m_inChannel == "resolution" || m_inChannel == "offset")
       {
-         return 3;
+         oss << " \"" << m_inChannel << "\"";
+         rv = 3;
       }
       else if (m_inCurField != m_inFields.end())
       {
-         MGlobal::displayInfo(MString("  => ") + m_inCurField->first.c_str());
+         oss << " \"" << m_inCurField->first << "\"";
          
          Field3DTools::Fld &fld = m_inCurField->second;
          
@@ -1007,26 +1009,33 @@ unsigned Field3dCacheFormat::readArraySize()
          case Field3DTools::SparseScalarField_Half:
          case Field3DTools::SparseScalarField_Float:
          case Field3DTools::SparseScalarField_Double:
-            return (res.x * res.y * res.z);
+            rv = (res.x * res.y * res.z);
+            break;
          case Field3DTools::DenseVectorField_Half:
          case Field3DTools::DenseVectorField_Float:
          case Field3DTools::DenseVectorField_Double:
          case Field3DTools::SparseVectorField_Half:
          case Field3DTools::SparseVectorField_Float:
          case Field3DTools::SparseVectorField_Double:
-            return 3 * (res.x * res.y * res.z);
+            rv = 3 * (res.x * res.y * res.z);
+            break;
          case Field3DTools::MACField_Half:
          case Field3DTools::MACField_Float:
-            return ((res.x + 1) * res.y * res.z) +
-                   (res.x * (res.y + 1) * res.z) +
-                   (res.y * res.y * (res.z + 1));
+            rv = ((res.x + 1) * res.y * res.z) +
+                 (res.x * (res.y + 1) * res.z) +
+                 (res.y * res.y * (res.z + 1));
+            break;
          default:
             break;
          }
       }
    }
    
-   return 0;
+   oss << " " << rv;
+   
+   MGlobal::displayInfo(oss.str().c_str());
+   
+   return rv;
 }
 
 MStatus Field3dCacheFormat::readDoubleArray(MDoubleArray &array, unsigned size)
@@ -1161,7 +1170,7 @@ MStatus Field3dCacheFormat::readArray(T &array, unsigned long arraySize)
 
 bool Field3dCacheFormat::handlesDescription()
 {
-  MGlobal::displayInfo(MString("f3dCache::handlesDescription: ") + (m_mode == kWrite ? "false" : "true"));
+  // MGlobal::displayInfo(MString("f3dCache::handlesDescription: ") + (m_mode == kWrite ? "false" : "true"));
   
   if (m_mode == kWrite)
   {
@@ -1170,7 +1179,8 @@ bool Field3dCacheFormat::handlesDescription()
   }
   else
   {
-    return true;
+    //return true;
+     return false;
   }
 }
 
