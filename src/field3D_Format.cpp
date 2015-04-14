@@ -118,24 +118,10 @@ Field3dCacheFormat::Field3dCacheFormat(Field3DTools::FieldTypeEnum type,
   , m_outFile(0)
 {
   Field3D::initIO();
-
-  /*
-  m_inFile = 0;
-  m_outFile = 0;
-  m_isFileOpened = false;
-  m_readNameStack = true;
-  m_offset[0] = 0.0;
-  m_offset[1] = 0.0;
-  m_offset[2] = 0.0;
-  */
-  
 }
 
 Field3dCacheFormat::~Field3dCacheFormat()
 {
-  m_cacheFiles.clear();
-  m_remapChannels.clear();
-  
   if (m_inFile)
   {
     delete m_inFile;
@@ -292,155 +278,170 @@ unsigned long Field3dCacheFormat::fillCacheFiles(const MString &path)
 
 unsigned long Field3dCacheFormat::fillCacheFiles(const MString &dirname, const MString &basename, const MString &ext)
 {
-  MStringArray tmp;
-
-  std::string dn = dirname.asChar();
-  if (dn.length() > 0)
-  {
-    char lc = dn[dn.length()-1];
-    
-    #ifdef _WIN32
-    if (lc != '\\' && lc != '/')
-    #else
-    if (lc != '/')
-    #endif
-    {
-      dn.push_back('/');
-    }
-  }
-  else
-  {
-    dn = "./";
-  }
-  
-  MString mdn = dn.c_str();
-  
-  MGlobal::executeCommand("getFileList -folder \"" + mdn + "\" -filespec \"" + basename + "*." + ext + "\"", tmp);
-  
-  m_cacheFiles.clear();
-  
-  MString _dn, _bn, _fn, _e;
-  MTime t;
-  
-  for (unsigned long i=0; i<tmp.length(); ++i)
-  {
-    if (identifyPath(tmp[i], _dn, _bn, _fn, t, _e))
-    {
-        m_cacheFiles[t].path = mdn + tmp[i];
-    }
-  }
+   MStringArray tmp;
+   
+   std::string dn = dirname.asChar();
+   if (dn.length() > 0)
+   {
+      char lc = dn[dn.length()-1];
       
-  return (unsigned long) m_cacheFiles.size();
+      #ifdef _WIN32
+      if (lc != '\\' && lc != '/')
+      #else
+      if (lc != '/')
+      #endif
+      {
+         dn.push_back('/');
+      }
+   }
+   else
+   {
+      dn = "./";
+   }
+   
+   MString mdn = dn.c_str();
+   
+   MGlobal::executeCommand("getFileList -folder \"" + mdn + "\" -filespec \"" + basename + "*." + ext + "\"", tmp);
+   
+   m_inSeq.clear();
+   
+   MString _dn, _bn, _fn, _e;
+   MTime t;
+   
+   for (unsigned long i=0; i<tmp.length(); ++i)
+   {
+     if (identifyPath(tmp[i], _dn, _bn, _fn, t, _e))
+      {
+         m_inSeq[t] = mdn + tmp[i];
+      }
+   }
+   
+   m_inCurFile = m_inSeq.end();
+   
+   return (unsigned long) m_inSeq.size();
+}
+
+void Field3dCacheFormat::resetInputFile()
+{
+   m_inFields.clear();
+   m_inCurField = m_inFields.end();
+   m_inNextField = m_inFields.end();
+   
+   m_inFluidName = "";
+   m_inPartition = "";
+   m_inChannel = "";
+   
+   // Note: Want to read that from .xml <extra> tags but readDescription is not called...
+   m_inMapChannels.clear();
+   m_inUnmapChannels.clear();
+   
+   m_inResolution = Field3D::V3i(0, 0, 0);
+   m_inOffset = Field3D::V3f(0.0f, 0.0f, 0.0f);
+   m_inDimension = Field3D::V3f(1.0f, 1.0f, 1.0f);
+   
+   if (m_inFile)
+   {
+      delete m_inFile;
+      m_inFile = 0;
+   }
+   
+   m_inCurFile = m_inSeq.end();
 }
 
 MStatus Field3dCacheFormat::open(const MString &fileName, FileAccessMode mode)
 {
-  MGlobal::displayInfo("f3dCache::open \"" + fileName + "\"");
-  
-  FileAccessMode curMode = m_mode;
-  
-  m_mode = mode;
-  
-  if (mode == kRead || mode == kReadWrite)
-  {
-    MGlobal::displayInfo("  For reading");
-    
-    MString dn, bn, frm, ext;
-    MTime t;
-    
-    if (!identifyPath(fileName, dn, bn, frm, t, ext))
-    {
-      return MS::kFailure;
-    }
-    
-    std::string inFilename = std::string(dn.asChar()) + "/" + bn.asChar();
-    
-    if (curMode == (FileAccessMode)-1 || inFilename != m_inFilename)
-    {
-      fillCacheFiles(fileName);
+   MGlobal::displayInfo("f3dCache::open \"" + fileName + "\"");
+   
+   m_mode = mode;
+   
+   if (mode == kRead || mode == kReadWrite)
+   {
+      // Note: this may be called several time for the same frame
+      MGlobal::displayInfo("  For reading");
       
-      m_inFilename = inFilename;
-      // ??? Want to read that from .xml <extra> tags
-      m_remapChannels.clear();
+      MString dn, bn, frm, ext;
+      MTime t;
       
-      m_curCacheFile = m_cacheFiles.end();
-      
-      m_inFluidName = "";
-      m_inPartition = "";
-      m_inChannel = "";
-    }
-    
-    std::map<MTime, CacheEntry>::iterator it = m_cacheFiles.find(t);
-    
-    if (it == m_cacheFiles.end())
-    {
-      m_curCacheFile = it;
-      
-      return MS::kFailure;
-    }
-    else if (it != m_curCacheFile || !m_inFile)
-    {
-      if (m_inFile)
+      if (!identifyPath(fileName, dn, bn, frm, t, ext))
       {
-        delete m_inFile;
-        
-        it->second.fields.clear();
-        
-        m_inFluidName = "";
-        m_inPartition = "";
-        m_inChannel = "";
+         return MS::kFailure;
       }
       
-      m_inFile = new Field3DInputFile();
+      std::string inFilename = std::string(dn.asChar()) + "/" + bn.asChar();
       
-      // open the file
-      if (!m_inFile->open(it->second.path.asChar()))
+      if (inFilename != m_inFilename)
       {
-        ERROR(std::string("Opening of") +  fileName.asChar() + "failed : Unknown reason");
-        delete m_inFile;
-        m_inFile = 0;
-        
-        return MS::kFailure;
+         // this is a difference file sequence
+         resetInputFile();
+         
+         m_inFilename = inFilename;
+         fillCacheFiles(fileName);
       }
       
-      m_curCacheFile = it;
-      m_curField = it->second.fields.end();
-      m_nextField = it->second.fields.end();
-    }
-    else
-    {
-      // same cache file, reset field iterators?
-      // -> this should be the role of findChannelName/readChannelName...
-    }
-  }
-  
-  if (mode == kWrite || mode == kReadWrite)
-  {
-    MGlobal::displayInfo("  For writing");
-    
-    if (m_outFile)
-    {
-      delete m_outFile;
-    }
-    
-    m_outFile = new Field3DOutputFile();
-     
-    // create the file
-    if (!m_outFile->create(fileName.asChar(), Field3DOutputFile::OverwriteMode))
-    {
-      ERROR(std::string("Creation of ") + fileName.asChar() + "failed : Unknown reason");
-      delete m_outFile;
-      m_outFile = 0;
+      std::map<MTime, MString>::iterator it = m_inSeq.find(t);
       
-      return MS::kFailure;
-    }
-    
-    m_outFilename = fileName.asChar();
-  }
-  
-  m_mode = mode;
-  
-  return MS::kSuccess;
+      if (it == m_inSeq.end())
+      {
+         // not a valid frame file
+         resetInputFile();
+         return MS::kFailure;
+      }
+      else
+      {
+         if (it != m_inCurFile && m_inFile)
+         {
+            // different frame than currently loaded one
+            resetInputFile();
+         }
+         
+         if (!m_inFile)
+         {
+            // frame not yet read
+            m_inFile = new Field3DInputFile();
+            
+            if (!m_inFile->open(it->second.asChar()))
+            {
+               ERROR(std::string("Opening of") +  fileName.asChar() + "failed : Unknown reason");
+               resetInputFile();
+               
+               return MS::kFailure;
+            }
+         }
+         
+         // at this point, if open was called for same frame as currently loaded one
+         // nothing should have changed (it == m_inCurFile)
+         
+         m_inCurFile = it;
+         m_inCurField = m_inFields.end();
+         m_inNextField = m_inFields.begin();
+      }
+   }
+   
+   if (mode == kWrite || mode == kReadWrite)
+   {
+      MGlobal::displayInfo("  For writing");
+      
+      if (m_outFile)
+      {
+         delete m_outFile;
+      }
+      
+      m_outFile = new Field3DOutputFile();
+      
+      // create the file
+      if (!m_outFile->create(fileName.asChar(), Field3DOutputFile::OverwriteMode))
+      {
+         ERROR(std::string("Creation of ") + fileName.asChar() + "failed : Unknown reason");
+         delete m_outFile;
+         m_outFile = 0;
+         
+         return MS::kFailure;
+      }
+      
+      m_outFilename = fileName.asChar();
+   }
+   
+   return MS::kSuccess;
 }
 
 void Field3dCacheFormat::close()
@@ -790,7 +791,7 @@ MStatus Field3dCacheFormat::writeArray(T &array)
 
 void Field3dCacheFormat::endWriteChunk()
 {
-  // Noop
+   // Noop
 }
 
 
@@ -807,342 +808,354 @@ MStatus Field3dCacheFormat::beginReadChunk()
   return MS::kSuccess;
 }
 
-
-MStatus Field3dCacheFormat::findChannelName(const MString &name)
+void Field3dCacheFormat::initFields(const std::string &partition)
 {
-  MGlobal::displayInfo("f3dCache::findChannelName \"" + name + "\"");
-  
-  if (m_curCacheFile == m_cacheFiles.end())
-  {
-    return MS::kFailure;
-  }
-  
-  // split into partition name
-  // call in turn for each fields
-  
-  std::string fluidName = extractFluidName(name);
-  std::string channel = extractChannelName(name);
-  std::string partition = partitionName(fluidName);
-  
-  CacheEntry &cacheFile = m_curCacheFile->second;
-  
-  // check if partition has changed
-  if (m_inPartition != partition)
-  {
-    // re-read partition fields
-    cacheFile.fields.clear();
-    
-    cacheFile.resolution[0] = 0.0f;
-    cacheFile.resolution[1] = 0.0f;
-    cacheFile.resolution[2] = 0.0f;
-    
-    cacheFile.offset[0] = 0.0f;
-    cacheFile.offset[1] = 0.0f;
-    cacheFile.offset[2] = 0.0f;
-    
-    // read all fields
-    std::vector<std::string> fields;
-    
-    Field3DTools::getFieldNames(m_inFile, partition, fields);
-    for (size_t i=0; i<fields.size(); ++i)
-    {
+   // re-read partition fields
+   m_inFields.clear();
+   
+   m_inResolution = Field3D::V3i(0, 0, 0);
+   m_inOffset = Field3D::V3f(0.0f, 0.0f, 0.0f);
+   m_inDimension = Field3D::V3f(1.0f, 1.0f, 1.0f);
+   
+   // read all fields
+   std::vector<std::string> fields;
+   
+   Field3DTools::getFieldNames(m_inFile, partition, fields);
+   
+   for (size_t i=0; i<fields.size(); ++i)
+   {
       Field3DTools::Fld field;
       
       if (Field3DTools::getFieldValueType(m_inFile, partition, fields[i], field))
       {
-        cacheFile.fields[fields[i]] = field;
-        
-        // supposes all field in a given partition have the same resolution, offset and dimension
-        
-        Field3D::V3i res = field.baseField->dataResolution();
-        
-        if (res.x > cacheFile.resolution.x)
-        {
-          cacheFile.resolution.x = res.x;
-        }
-        if (res.y > cacheFile.resolution.y)
-        {
-          cacheFile.resolution.y = res.y;
-        }
-        if (res.z > cacheFile.resolution.z)
-        {
-          cacheFile.resolution.z = res.z;
-        }
-        
-        cacheFile.offset += field.baseField->metadata().vecFloatMetadata("Offset", Field3D::V3f(0.0f, 0.0f, 0.0f));
-        
-        cacheFile.dimension += field.baseField->metadata().vecFloatMetadata("Dimension", Field3D::V3f(1.0f, 1.0f, 1.0f));
+         m_inFields[fields[i]] = field;
+         
+         // supposes all field in a given partition have the same resolution, offset and dimension
+         
+         Field3D::V3i res = field.baseField->dataResolution();
+         
+         if (res.x > m_inResolution.x)
+         {
+            m_inResolution.x = res.x;
+         }
+         if (res.y > m_inResolution.y)
+         {
+            m_inResolution.y = res.y;
+         }
+         if (res.z > m_inResolution.z)
+         {
+            m_inResolution.z = res.z;
+         }
+         
+         m_inOffset += field.baseField->metadata().vecFloatMetadata("Offset", Field3D::V3f(0.0f, 0.0f, 0.0f));
+         
+         m_inDimension += field.baseField->metadata().vecFloatMetadata("Dimension", Field3D::V3f(1.0f, 1.0f, 1.0f));
       }
-    }
-    
-    if (cacheFile.fields.size() > 0)
-    {
-      float scl = 1.0f / float(cacheFile.fields.size());
+   }
+   
+   if (m_inFields.size() > 0)
+   {
+      float scl = 1.0f / float(m_inFields.size());
       
-      cacheFile.offset *= scl;
-      cacheFile.dimension *= scl;
-    }
-    
-    m_curField = cacheFile.fields.end();
-  }
-  
-  if (cacheFile.fields.size() == 0)
-  {
-    return MS::kFailure;
-  }
-  
-  // remap channel name
-  std::map<std::string, std::string>::iterator rit = m_remapChannels.find(channel);
-  if (rit != m_remapChannels.end())
-  {
-    channel = rit->second;
-  }
-  
-  m_inFluidName = fluidName;
-  m_inPartition = partition;
-  m_inChannel = channel;
-  
-  if (channel == "resolution" || channel == "offset")
-  {
-    m_curField = cacheFile.fields.end();
-    m_nextField = cacheFile.fields.begin();
-    return MS::kSuccess;
-  }
-  
-  m_nextField = cacheFile.fields.find(channel);
-  m_curField = m_nextField++;
-  
-  return (m_curField != cacheFile.fields.end() ? MS::kSuccess : MS::kFailure);
+      m_inOffset *= scl;
+      m_inDimension *= scl;
+   }
+   
+   m_inCurField = m_inFields.end();
+   m_inNextField = m_inFields.begin();
+}
+
+MStatus Field3dCacheFormat::findChannelName(const MString &name)
+{
+   MGlobal::displayInfo("f3dCache::findChannelName \"" + name + "\"");
+   
+   if (!m_inFile)
+   {
+      return MS::kFailure;
+   }
+   
+   // split into partition name
+   // call in turn for each fields
+   
+   std::string fluidName = extractFluidName(name);
+   std::string channel = extractChannelName(name);
+   std::string partition = partitionName(fluidName);
+   
+   // check if partition has changed
+   if (m_inPartition != partition)
+   {
+      initFields(partition);
+      
+      m_inFluidName = fluidName;
+      m_inPartition = partition;
+   }
+   
+   if (m_inFields.size() == 0)
+   {
+      return MS::kFailure;
+   }
+   
+   // map maya channel name to field3d name
+   std::map<std::string, std::string>::iterator rit = m_inMapChannels.find(channel);
+   if (rit != m_inMapChannels.end())
+   {
+      channel = rit->second;
+   }
+   
+   m_inChannel = channel;
+   
+   if (channel == "resolution" || channel == "offset")
+   {
+      m_inCurField = m_inFields.end();
+      return MS::kSuccess;
+   }
+   else
+   {
+      m_inCurField = m_inFields.find(channel);
+      return (m_inCurField != m_inFields.end() ? MS::kSuccess : MS::kFailure);
+   }
 }
 
 MStatus Field3dCacheFormat::readChannelName(MString &name)
 {
-  MGlobal::displayInfo("f3dCache::readChannelName");
-  
-  if (m_curCacheFile == m_cacheFiles.end())
-  {
-    return MS::kFailure;
-  }
-  
-  CacheEntry &cacheFile = m_curCacheFile->second;
-  
-  if (m_nextField != cacheFile.fields.end())
-  {
-    name = (m_inFluidName + "_" + m_nextField->first).c_str();
-    m_curField = m_nextField++;
-    MGlobal::displayInfo("  => " + name);
-    return MS::kSuccess;
-  }
-  else
-  {
-    return MS::kFailure;
-  }
+   MGlobal::displayInfo("f3dCache::readChannelName");
+   
+   if (!m_inFile)
+   {
+      return MS::kFailure;
+   }
+   
+   if (m_inFluidName == "")
+   {
+      return MS::kFailure;
+   }
+   
+   if (m_inNextField != m_inFields.end())
+   {
+      m_inCurField = m_inNextField++;
+      
+      m_inChannel = m_inCurField->first;
+      
+      // map field3d name to maya name
+      std::string channel = m_inChannel;
+      std::map<std::string, std::string>::iterator rit = m_inUnmapChannels.find(channel);
+      if (rit != m_inUnmapChannels.end())
+      {
+         channel = rit->second;
+      }
+      
+      name = (m_inFluidName + "_" + channel).c_str();
+      MGlobal::displayInfo("  => " + name);
+      
+      return MS::kSuccess;
+   }
+   else
+   {
+      return MS::kFailure;
+   }
 }
 
 void Field3dCacheFormat::endReadChunk()
 {
-  //MGlobal::displayInfo("f3dCache::endReadChunk");
+   //MGlobal::displayInfo("f3dCache::endReadChunk");
 }
 
 MStatus Field3dCacheFormat::readTime(MTime &time)
 {
-  MGlobal::displayInfo("f3dCache::readTime");
-  return MS::kFailure;
+   MGlobal::displayInfo("f3dCache::readTime");
+   return MS::kFailure;
 }
 
 MStatus Field3dCacheFormat::findTime(MTime &time, MTime &foundTime)
 {
-  std::ostringstream oss;
-  oss << time.as(MTime::uiUnit());
-  
-  MGlobal::displayInfo(MString("f3dCache::findTime ") + oss.str().c_str());
-  return MS::kFailure;
+   std::ostringstream oss;
+   oss << time.as(MTime::uiUnit());
+   
+   MGlobal::displayInfo(MString("f3dCache::findTime ") + oss.str().c_str());
+   return MS::kFailure;
 }
 
 MStatus Field3dCacheFormat::readNextTime(MTime &foundTime)
 {
-  MGlobal::displayInfo("f3dCache::readNextTime");
-  return MS::kFailure;
+   MGlobal::displayInfo("f3dCache::readNextTime");
+   return MS::kFailure;
 }
 
 unsigned Field3dCacheFormat::readArraySize()
 {
-  MGlobal::displayInfo("f3dCache::readArraySize");
-  
-  if (m_curCacheFile != m_cacheFiles.end())
-  {
-    if (m_inChannel == "resolution" || m_inChannel == "offset")
-    {
-      return 3;
-    }
-    else if (m_curField != m_curCacheFile->second.fields.end())
-    {
-      MGlobal::displayInfo(MString("  => ") + m_curField->first.c_str());
-      
-      // return field resolution
-      Field3DTools::Fld &fld = m_curField->second;
-      
-      Field3D::V3i res = fld.baseField->dataResolution();
-      
-      switch (fld.fieldType)
+   MGlobal::displayInfo("f3dCache::readArraySize");
+   
+   if (m_inFile)
+   {
+      if (m_inChannel == "resolution" || m_inChannel == "offset")
       {
-      case Field3DTools::DenseScalarField_Half:
-      case Field3DTools::DenseScalarField_Float:
-      case Field3DTools::DenseScalarField_Double:
-      case Field3DTools::SparseScalarField_Half:
-      case Field3DTools::SparseScalarField_Float:
-      case Field3DTools::SparseScalarField_Double:
-        return (res.x * res.y * res.z);
-      case Field3DTools::DenseVectorField_Half:
-      case Field3DTools::DenseVectorField_Float:
-      case Field3DTools::DenseVectorField_Double:
-      case Field3DTools::SparseVectorField_Half:
-      case Field3DTools::SparseVectorField_Float:
-      case Field3DTools::SparseVectorField_Double:
-        return 3 * (res.x * res.y * res.z);
-      case Field3DTools::MACField_Half:
-      case Field3DTools::MACField_Float:
-        return ((res.x + 1) * res.y * res.z) +
-               (res.x * (res.y + 1) * res.z) +
-               (res.y * res.y * (res.z + 1));
-      default:
-        return 0;
+         return 3;
       }
-    }
-  }
-  
-  return 0;
+      else if (m_inCurField != m_inFields.end())
+      {
+         MGlobal::displayInfo(MString("  => ") + m_inCurField->first.c_str());
+         
+         Field3DTools::Fld &fld = m_inCurField->second;
+         
+         Field3D::V3i res = fld.baseField->dataResolution();
+         
+         switch (fld.fieldType)
+         {
+         case Field3DTools::DenseScalarField_Half:
+         case Field3DTools::DenseScalarField_Float:
+         case Field3DTools::DenseScalarField_Double:
+         case Field3DTools::SparseScalarField_Half:
+         case Field3DTools::SparseScalarField_Float:
+         case Field3DTools::SparseScalarField_Double:
+            return (res.x * res.y * res.z);
+         case Field3DTools::DenseVectorField_Half:
+         case Field3DTools::DenseVectorField_Float:
+         case Field3DTools::DenseVectorField_Double:
+         case Field3DTools::SparseVectorField_Half:
+         case Field3DTools::SparseVectorField_Float:
+         case Field3DTools::SparseVectorField_Double:
+            return 3 * (res.x * res.y * res.z);
+         case Field3DTools::MACField_Half:
+         case Field3DTools::MACField_Float:
+            return ((res.x + 1) * res.y * res.z) +
+                   (res.x * (res.y + 1) * res.z) +
+                   (res.y * res.y * (res.z + 1));
+         default:
+            break;
+         }
+      }
+   }
+   
+   return 0;
 }
 
 MStatus Field3dCacheFormat::readDoubleArray(MDoubleArray &array, unsigned size)
 {
-  MGlobal::displayInfo("f3dCache::readDoubleArray");
-  return readArray(array, size);
+   MGlobal::displayInfo("f3dCache::readDoubleArray");
+   return readArray(array, size);
 }
 
 MStatus Field3dCacheFormat::readFloatArray(MFloatArray &array, unsigned size)
 {
-  MGlobal::displayInfo("f3dCache::readFloatArray");
-  return readArray(array, size);
+   MGlobal::displayInfo("f3dCache::readFloatArray");
+   return readArray(array, size);
 }
 
 MStatus Field3dCacheFormat::readIntArray(MIntArray &, unsigned size)
 {
-  MGlobal::displayInfo("f3dCache::readIntArray");
-  return MS::kFailure;
+   MGlobal::displayInfo("f3dCache::readIntArray");
+   return MS::kFailure;
 }
 
 MStatus Field3dCacheFormat::readDoubleVectorArray(MVectorArray &, unsigned arraySize)
 {
-  MGlobal::displayInfo("f3dCache::readDoubleVectorArray");
-  return MS::kFailure;
+   MGlobal::displayInfo("f3dCache::readDoubleVectorArray");
+   return MS::kFailure;
 }
 
 MStatus Field3dCacheFormat::readFloatVectorArray(MFloatVectorArray &array, unsigned arraySize)
 {
-  MGlobal::displayInfo("f3dCache::readFloatVectorArray");
-  return MS::kFailure;
+   MGlobal::displayInfo("f3dCache::readFloatVectorArray");
+   return MS::kFailure;
 }
 
 int Field3dCacheFormat::readInt32()
 {
-  MGlobal::displayInfo("f3dCache::readInt32");
-  return 0;
+   MGlobal::displayInfo("f3dCache::readInt32");
+   return 0;
 }
 
 template <class T>
 MStatus Field3dCacheFormat::readArray(T &array, unsigned long arraySize)
 {
-  if (m_curCacheFile == m_cacheFiles.end())
-  {
-    return MS::kFailure;
-  }
-  
-  CacheEntry &cacheFile = m_curCacheFile->second;
-  
-  array.setLength(arraySize);
-  
-  if (m_inChannel == "resolution")
-  {
-    array[0] = (unsigned int) cacheFile.resolution.x;
-    array[1] = (unsigned int) cacheFile.resolution.y;
-    array[2] = (unsigned int) cacheFile.resolution.z;
-    
-    return MS::kSuccess;
-  }
-  else if (m_inChannel == "offset")
-  {
-    array[0] = cacheFile.offset.x;
-    array[1] = cacheFile.offset.y;
-    array[2] = cacheFile.offset.z;
-    
-    return MS::kSuccess;
-  }
-  else if (m_curField == cacheFile.fields.end())
-  {
-    return MS::kFailure;
-  }
-  
-  Field3DTools::Fld &field = m_curField->second;
-  
-  
-  // pointer to the read function we'll call based on the dynamic type
-  bool success = false;
-  
-  // select the proper function to call
-  switch (field.fieldType)
-  {
-  case Field3DTools::DenseScalarField_Half:
-    success = Field3DTools::readScalarField<Field3D::half, T>(field.dhScalarField, array);
-    break;
-  case Field3DTools::DenseScalarField_Float:
-    success = Field3DTools::readScalarField<float, T>(field.dfScalarField, array);
-    break;
-  case Field3DTools::DenseScalarField_Double:
-    success = Field3DTools::readScalarField<double, T>(field.ddScalarField, array);
-    break;
-  case Field3DTools::SparseScalarField_Half:
-    success = Field3DTools::readScalarField<Field3D::half, T>(field.shScalarField, array);
-    break;
-  case Field3DTools::SparseScalarField_Float:
-    success = Field3DTools::readScalarField<float, T>(field.sfScalarField, array);
-    break;
-  case Field3DTools::SparseScalarField_Double:
-    success = Field3DTools::readScalarField<double, T>(field.sdScalarField, array);
-    break;
-  case Field3DTools::DenseVectorField_Half:
-    success = Field3DTools::readVectorField<Field3D::half, T>(field.dhVectorField, array);
-    break;
-  case Field3DTools::DenseVectorField_Float:
-    success = Field3DTools::readVectorField<float, T>(field.dfVectorField, array);
-    break;
-  case Field3DTools::DenseVectorField_Double:
-    success = Field3DTools::readVectorField<double, T>(field.ddVectorField, array);
-    break;
-  case Field3DTools::SparseVectorField_Half:
-    success = Field3DTools::readVectorField<Field3D::half, T>(field.shVectorField, array);
-    break;
-  case Field3DTools::SparseVectorField_Float:
-    success = Field3DTools::readVectorField<float, T>(field.sfVectorField, array);
-    break;
-  case Field3DTools::SparseVectorField_Double:
-    success = Field3DTools::readVectorField<double, T>(field.sdVectorField, array);
-    break;
-  case Field3DTools::MACField_Half:
-    success = Field3DTools::readMACField<Field3D::half, T>(field.mhField, array);
-    break;
-  case Field3DTools::MACField_Float:
-    success = Field3DTools::readMACField<float, T>(field.mfField, array);
-    break;
-  case Field3DTools::MACField_Double:
-    success = Field3DTools::readMACField<double, T>(field.mdField, array);
-    break;
-  default:
-    ERROR("Type unknown or unsupported");
-    return MS::kFailure;
-  }
-  
-  return (success ? MS::kSuccess : MS::kFailure);
+   if (!m_inFile)
+   {
+      return MS::kFailure;
+   }
+   
+   array.setLength(arraySize);
+   
+   if (m_inChannel == "resolution")
+   {
+      array[0] = (unsigned int) m_inResolution.x;
+      array[1] = (unsigned int) m_inResolution.y;
+      array[2] = (unsigned int) m_inResolution.z;
+      
+      return MS::kSuccess;
+   }
+   else if (m_inChannel == "offset")
+   {
+      array[0] = m_inOffset.x;
+      array[1] = m_inOffset.y;
+      array[2] = m_inOffset.z;
+      
+      return MS::kSuccess;
+   }
+   else if (m_inCurField == m_inFields.end())
+   {
+      return MS::kFailure;
+   }
+   
+   Field3DTools::Fld &field = m_inCurField->second;
+   
+   
+   // pointer to the read function we'll call based on the dynamic type
+   bool success = false;
+   
+   // select the proper function to call
+   switch (field.fieldType)
+   {
+   case Field3DTools::DenseScalarField_Half:
+      success = Field3DTools::readScalarField<Field3D::half, T>(field.dhScalarField, array);
+      break;
+   case Field3DTools::DenseScalarField_Float:
+      success = Field3DTools::readScalarField<float, T>(field.dfScalarField, array);
+      break;
+   case Field3DTools::DenseScalarField_Double:
+      success = Field3DTools::readScalarField<double, T>(field.ddScalarField, array);
+      break;
+   case Field3DTools::SparseScalarField_Half:
+      success = Field3DTools::readScalarField<Field3D::half, T>(field.shScalarField, array);
+      break;
+   case Field3DTools::SparseScalarField_Float:
+      success = Field3DTools::readScalarField<float, T>(field.sfScalarField, array);
+      break;
+   case Field3DTools::SparseScalarField_Double:
+      success = Field3DTools::readScalarField<double, T>(field.sdScalarField, array);
+      break;
+   case Field3DTools::DenseVectorField_Half:
+      success = Field3DTools::readVectorField<Field3D::half, T>(field.dhVectorField, array);
+      break;
+   case Field3DTools::DenseVectorField_Float:
+      success = Field3DTools::readVectorField<float, T>(field.dfVectorField, array);
+      break;
+   case Field3DTools::DenseVectorField_Double:
+      success = Field3DTools::readVectorField<double, T>(field.ddVectorField, array);
+      break;
+   case Field3DTools::SparseVectorField_Half:
+      success = Field3DTools::readVectorField<Field3D::half, T>(field.shVectorField, array);
+      break;
+   case Field3DTools::SparseVectorField_Float:
+      success = Field3DTools::readVectorField<float, T>(field.sfVectorField, array);
+      break;
+   case Field3DTools::SparseVectorField_Double:
+      success = Field3DTools::readVectorField<double, T>(field.sdVectorField, array);
+      break;
+   case Field3DTools::MACField_Half:
+      success = Field3DTools::readMACField<Field3D::half, T>(field.mhField, array);
+      break;
+   case Field3DTools::MACField_Float:
+      success = Field3DTools::readMACField<float, T>(field.mfField, array);
+      break;
+   case Field3DTools::MACField_Double:
+      success = Field3DTools::readMACField<double, T>(field.mdField, array);
+      break;
+   default:
+      ERROR("Type unknown or unsupported");
+      return MS::kFailure;
+   }
+   
+   return (success ? MS::kSuccess : MS::kFailure);
 }
 
 

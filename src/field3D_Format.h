@@ -180,38 +180,35 @@ private:
    
    FileAccessMode m_mode;
    
-   std::string m_inFilename;
+   std::map<MTime, MString> m_inSeq;
+   std::map<MTime, MString>::iterator m_inCurFile;
    Field3DInputFile *m_inFile;
+   std::string m_inFilename;
    std::string m_inFluidName;
    std::string m_inPartition;
    std::string m_inChannel;
+   std::map<std::string, Field3DTools::Fld> m_inFields;
+   Field3D::V3i m_inResolution;
+   Field3D::V3f m_inOffset;
+   Field3D::V3f m_inDimension;
+   std::map<std::string, std::string> m_inMapChannels; // maya name -> field3d name
+   std::map<std::string, std::string> m_inUnmapChannels; // field3d name -> maya name
+   std::map<std::string, Field3DTools::Fld>::iterator m_inCurField;
+   std::map<std::string, Field3DTools::Fld>::iterator m_inNextField;
    
-   std::string m_outFilename;
    Field3DOutputFile *m_outFile;
+   std::string m_outFilename;
    std::string m_outPartition;
    std::string m_outChannel;
    MFnFluid m_outFluid;
    float m_outOffset[3];
    
-   
-   struct CacheEntry
-   {
-      MString path;
-      std::map<std::string, Field3DTools::Fld> fields;
-      Field3D::V3i resolution;
-      Field3D::V3f offset;
-      Field3D::V3f dimension;
-   };
-   
-   std::map<std::string, std::string> m_remapChannels;
-   std::map<MTime, CacheEntry> m_cacheFiles;
-   std::map<MTime, CacheEntry>::iterator m_curCacheFile;
-   std::map<std::string, Field3DTools::Fld>::iterator m_curField;
-   std::map<std::string, Field3DTools::Fld>::iterator m_nextField;
-   
    bool identifyPath(const MString &path, MString &dirname, MString &basename, MString &frame, MTime &t, MString &ext);
    unsigned long fillCacheFiles(const MString &path);
    unsigned long fillCacheFiles(const MString &dirname, const MString &basename, const MString &ext);
+   
+   void resetInputFile();
+   void initFields(const std::string &partition);
    
    /*
    std::string m_filename;
