@@ -964,6 +964,9 @@ void exportF3d::setF3dField(MFnFluid &fluidFn, const char *outputPath,
     localToWorld *= M44d().setTranslation( dynamicOffset );
     localToWorld *= fluid_mat;
     
+    Field3D::V3f Offset(Field3D::V3f(dynamicOffset.x, dynamicOffset.y, dynamicOffset.z));
+    Field3D::V3f Dimension(xdim, ydim, zdim);
+    
     mapping->setLocalToWorld(localToWorld);  
       
     if (m_hasDensity)
@@ -971,6 +974,8 @@ void exportF3d::setF3dField(MFnFluid &fluidFn, const char *outputPath,
       densityFld = new FField;
       densityFld->setSize(res);
       densityFld->setMapping(mapping);
+      densityFld->metadata().setVecFloatMetadata("Offset", Offset);
+      densityFld->metadata().setVecFloatMetadata("Dimension", Dimension);
     }
     
     if (m_hasFuel)
@@ -978,6 +983,8 @@ void exportF3d::setF3dField(MFnFluid &fluidFn, const char *outputPath,
       fuelFld = new FField;
       fuelFld->setSize(res); 
       fuelFld->setMapping(mapping);
+      fuelFld->metadata().setVecFloatMetadata("Offset", Offset);
+      fuelFld->metadata().setVecFloatMetadata("Dimension", Dimension);
     }
     
     if (m_hasTemperature)
@@ -985,6 +992,8 @@ void exportF3d::setF3dField(MFnFluid &fluidFn, const char *outputPath,
       tempFld = new FField;
       tempFld->setSize(res);
       tempFld->setMapping(mapping);
+      tempFld->metadata().setVecFloatMetadata("Offset", Offset);
+      tempFld->metadata().setVecFloatMetadata("Dimension", Dimension);
     }
     
     if (m_hasPressure)
@@ -992,6 +1001,8 @@ void exportF3d::setF3dField(MFnFluid &fluidFn, const char *outputPath,
       pressureFld = new FField;
       pressureFld->setSize(res);
       pressureFld->setMapping(mapping);
+      pressureFld->metadata().setVecFloatMetadata("Offset", Offset);
+      pressureFld->metadata().setVecFloatMetadata("Dimension", Dimension);
     }
     
     if (m_hasFalloff)
@@ -999,6 +1010,8 @@ void exportF3d::setF3dField(MFnFluid &fluidFn, const char *outputPath,
       falloffFld = new FField;
       falloffFld->setSize(res);
       falloffFld->setMapping(mapping);
+      falloffFld->metadata().setVecFloatMetadata("Offset", Offset);
+      falloffFld->metadata().setVecFloatMetadata("Dimension", Dimension);
     }
     
     if (m_hasVelocity)
@@ -1006,6 +1019,8 @@ void exportF3d::setF3dField(MFnFluid &fluidFn, const char *outputPath,
       vMac = new MField;
       vMac->setSize(res);
       vMac->setMapping(mapping);
+      vMac->metadata().setVecFloatMetadata("Offset", Offset);
+      vMac->metadata().setVecFloatMetadata("Dimension", Dimension);
     }
     
     if (m_hasColor)
@@ -1013,6 +1028,8 @@ void exportF3d::setF3dField(MFnFluid &fluidFn, const char *outputPath,
       CdFld = new VField;
       CdFld->setSize(res);
       CdFld->setMapping(mapping);
+      CdFld->metadata().setVecFloatMetadata("Offset", Offset);
+      CdFld->metadata().setVecFloatMetadata("Dimension", Dimension);
     } 
     
     if (m_hasTexture)
@@ -1020,6 +1037,8 @@ void exportF3d::setF3dField(MFnFluid &fluidFn, const char *outputPath,
       uvwFld = new VField;
       uvwFld->setSize(res);
       uvwFld->setMapping(mapping);
+      uvwFld->metadata().setVecFloatMetadata("Offset", Offset);
+      uvwFld->metadata().setVecFloatMetadata("Dimension", Dimension);
     } 
         
     size_t iX, iY, iZ;      
