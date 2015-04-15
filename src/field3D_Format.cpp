@@ -325,12 +325,15 @@ unsigned long Field3dCacheFormat::fillCacheFiles(const MString &dirname, const M
    
    for (unsigned long i=0; i<tmp.length(); ++i)
    {
+      // MGlobal::displayInfo("Found file " + tmp[i]);
+      
       if (m_inDesc.filePattern.length() > 0)
       {
          if (m_inDesc.useSubFrames)
          {
             if (sscanf(tmp[i].asChar(), m_inDesc.filePattern.c_str(), &f, &sf) != 2)
             {
+               // MGlobal::displayWarning(MString("File doesn't match pattern with subframe ") + m_inDesc.filePattern.c_str() + ": \"" + tmp[i] + "\"");
                continue;
             }
          }
@@ -338,6 +341,7 @@ unsigned long Field3dCacheFormat::fillCacheFiles(const MString &dirname, const M
          {
             if (sscanf(tmp[i].asChar(), m_inDesc.filePattern.c_str(), &f) != 1)
             {
+               // MGlobal::displayWarning(MString("File doesn't match pattern ") + m_inDesc.filePattern.c_str() + ": \"" + tmp[i] + "\"");
                continue;
             }
          }
@@ -346,6 +350,10 @@ unsigned long Field3dCacheFormat::fillCacheFiles(const MString &dirname, const M
       if (identifyPath(tmp[i], _dn, _bn, _fn, t, _e))
       {
          m_inSeq[t] = mdn + tmp[i];
+      }
+      else
+      {
+         // MGlobal::displayWarning("Could not identify file " + tmp[i]);
       }
    }
    
@@ -392,35 +400,44 @@ MStatus Field3dCacheFormat::open(const MString &fileName, FileAccessMode mode)
       }
       
       std::string inFilename = std::string(dn.asChar()) + "/" + bn.asChar();
+      std::string inDescFile = inFilename + ".xml";
+      
+      if (inDescFile != m_inDescFile)
+      {
+         MGlobal::displayInfo(MString("Description changed to ") + inDescFile.c_str());
+         
+         m_inDesc.clear();
+         
+         readDescription(inDescFile, m_inDesc);
+         
+         m_inDescFile = inDescFile;
+      }
+      
+      if (m_inDesc.dir.length() > 0)
+      {
+         inFilename = m_inDesc.dir + "/" + bn.asChar();
+         dn = m_inDesc.dir.c_str();
+      }
+      
+      if (m_inDesc.basename.length() > 0)
+      {
+         inFilename = std::string(dn.asChar()) + "/" + m_inDesc.basename;
+         bn = m_inDesc.basename.c_str();
+      }
       
       if (inFilename != m_inFilename)
       {
-         SequenceDesc desc;
+         MGlobal::displayInfo(MString("Sequence changed to ") + inFilename.c_str());
          
-         readDescription(inFilename + ".xml", desc);
-                  
-         if (desc.dir.length() > 0)
-         {
-            inFilename = desc.dir + "/" + bn.asChar();
-            dn = desc.dir.c_str();
-         }
+         // this is a difference file sequence
+         resetInputFile();
          
-         // re-evaluate inFilename
+         m_inFilename = inFilename;
          
-         if (inFilename != m_inFilename)
-         {
-            m_inDesc = desc;
-            
-            // this is a difference file sequence
-            resetInputFile();
-            
-            m_inFilename = inFilename;
-            
-            // don't use fileName as directory may have changed
-            // basename should stay identical whatever the frame pattern is
-            
-            fillCacheFiles(dn, bn, ext);
-         }
+         // don't use fileName as directory may have changed
+         // basename should stay identical whatever the frame pattern is
+         
+         fillCacheFiles(dn, bn, ext);
       }
       
       std::map<MTime, MString>::iterator it = m_inSeq.find(t);
@@ -1221,6 +1238,9 @@ bool Field3dCacheFormat::readDescription(const std::string &xmlPath, Field3dCach
                }
                else
                {
+                  MString dn, bn, frm, ext;
+                  MTime t;
+                  
                   desc.useSubFrames = (n == 2);
                   
                   size_t p = desc.filePattern.find_last_of("\\/");
@@ -1233,6 +1253,24 @@ bool Field3dCacheFormat::readDescription(const std::string &xmlPath, Field3dCach
                   {
                      desc.dir = "";
                   }
+                  
+                  char *tmp = new char[desc.filePattern.length() + 128];
+                  
+                  if (desc.useSubFrames)
+                  {
+                     sprintf(tmp, desc.filePattern.c_str(), 1, 1);
+                  }
+                  else
+                  {
+                     sprintf(tmp, desc.filePattern.c_str(), 1);
+                  }
+                  
+                  if (identifyPath(MString(tmp), dn, bn, frm, t, ext))
+                  {
+                     desc.basename = bn.asChar();
+                  }
+                  
+                  delete[] tmp;
                   
                   MGlobal::displayInfo(MString("  File pattern: ") + desc.filePattern.c_str() + " (in directory: \"" + desc.dir.c_str() + "\")");
                }

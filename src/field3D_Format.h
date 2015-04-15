@@ -144,6 +144,7 @@ private:
    struct SequenceDesc
    {
       std::string dir;
+      std::string basename;
       std::string filePattern;
       bool useSubFrames;
       std::map<std::string, std::string> mapChannels; // maya name -> field3d name
@@ -159,6 +160,7 @@ private:
          mapChannels.clear();
          unmapChannels.clear();
          dir = "";
+         basename = "";
          filePattern = "";
          useSubFrames = false;
       }
@@ -167,6 +169,7 @@ private:
    std::map<MTime, MString> m_inSeq;
    std::map<MTime, MString>::iterator m_inCurFile;
    Field3DInputFile *m_inFile;
+   std::string m_inDescFile;
    std::string m_inFilename;
    std::string m_inFluidName;
    std::string m_inPartition;
