@@ -123,21 +123,6 @@ bool getFieldsResolution(Field3D::Field3DInputFile *inFile, unsigned int (&resol
   return getFieldsResolution(inFile, "", "", resolution);
 }
 
-/*
-template<typename Data_Type>
-bool testScalarDataType(Field3DInputFile *inFile, const std::string &partition, const std::string &name)
-{
-  typename Field<Data_Type>::Vec res = readScalarLayers<Data_Type>(inFile, partition, name);
-  return (!res.empty());
-}
-
-template<typename Data_Type>
-bool testVectorDataType(Field3DInputFile *inFile, const std::string &partition, const std::string &name)
-{
-  typename Field<FIELD3D_VEC3_T<Data_Type> >::Vec res = readVectorLayers<Data_Type>(inFile, partition, name);
-  return (!res.empty());
-}
-*/
 
 bool getFieldValueType( Field3DInputFile *inFile , const std::string &partition, const std::string &name, Fld &fld)
 {

@@ -68,7 +68,6 @@
 
 using namespace Field3D;
 
-
 #include "field3D_Tools.h"
 
 class Field3dCacheFormat : public MPxCacheFormat
@@ -93,7 +92,7 @@ public:
    virtual void close();
    virtual MStatus isValid();
    virtual MStatus rewind();
-   virtual MString extension(); // { return "f3d"; }
+   virtual MString extension();
    
    virtual MStatus readHeader();
    virtual MStatus beginReadChunk();
@@ -127,45 +126,7 @@ public:
    virtual MStatus readDescription(MCacheFormatDescription &description, const MString &descriptionFileLocation, const MString &baseFileName);
    virtual MStatus writeDescription(const MCacheFormatDescription &description, const MString &descriptionFileLocation, const MString &baseFileName);
    
-   /*
-   // general functions inherited from MPxCacheFormat
-   MStatus open    ( const MString& fileName, FileAccessMode mode);
-   void    close   ();
-   MStatus isValid ();
-   
-   // write functions inherited from MPxCacheFormat
-   MStatus writeHeader      ( const MString& version, MTime& startTime, MTime& endTime);
-   MStatus writeFloatArray  ( const MFloatArray&   );
-   MStatus writeDoubleArray ( const MDoubleArray&  );
-   MStatus writeChannelName ( const MString & name );
-   MStatus writeTime        ( MTime& time);
-   void    beginWriteChunk  () {};
-   void    endWriteChunk    () {};
-   
-   // read functions inherited from MPxCacheFormat
-   MStatus  readFloatArray  ( MFloatArray&  , unsigned size );
-   MStatus  readDoubleArray ( MDoubleArray& , unsigned size );
-   MStatus  findChannelName ( const MString & name);
-   MStatus  readChannelName ( MString& name);
-   unsigned readArraySize   ();
-   MStatus  readHeader      ();
-   MStatus  beginReadChunk  () {return MStatus::kSuccess;};
-   void     endReadChunk    () {};
-   
-   // timeline
-   MStatus  readTime        ( MTime& time);
-   MStatus  findTime        ( MTime& time, MTime& foundTime);
-   MStatus  readNextTime    ( MTime& foundTime);
-   MStatus  rewind();
-   
 private:
-   
-   template <class T>  // T is MFloatArray or MDoubleArray
-   MStatus writeArray(T  &array);
-   
-   template <class T>  // T is MFloatArray or MDoubleArray
-   MStatus readArray(T &array, unsigned arraySize);
-   */
    
    template <class T>
    MStatus readArray(T &array, unsigned long arraySize);
@@ -186,7 +147,6 @@ private:
    std::string m_inFilename;
    std::string m_inFluidName;
    std::string m_inPartition;
-   std::string m_inChannel;
    std::map<std::string, Field3DTools::Fld> m_inFields;
    Field3D::V3i m_inResolution;
    Field3D::V3f m_inOffset;
@@ -209,19 +169,6 @@ private:
    
    void resetInputFile();
    void initFields(const std::string &partition);
-   
-   /*
-   std::string m_filename;
-   bool m_isFileOpened;
-   MString m_currentName;
-   bool m_readNameStack;
-   float m_offset[3];
-   
-   std::deque<std::string> m_nameStack;
-   */
-   
-   // export Type
-   
 };
 
 #endif
