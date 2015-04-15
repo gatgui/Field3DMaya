@@ -29,6 +29,32 @@ extern size_t Split(const std::string &s, char sep, std::vector<std::string> &sp
 extern void ToPrintfPattern(std::string &name);
 extern size_t GetFileList(const std::string &filePattern, std::vector<std::string> &files, int *start=0, int *end=0);
 
+static std::string NormalizePath(const std::string &p, bool doCase=false)
+{
+  std::string out = p;
+  
+  #ifdef _WIN32
+  for (size_t i=0; i<out.length(); ++i)
+  {
+    if (out[i] == '\\')
+    {
+      out[i] = '/';
+    }
+    else if (doCase && (out[i] >= 'A' && out[i] <= 'Z'))
+    {
+      out[i] = 'a' + (out[i] - 'A');
+    }
+  }
+  #endif
+  
+  return out;
+}
+
+static bool SamePath(const std::string &p0, const std::string &p1)
+{
+  return (NormalizePath(p0, true) == NormalizePath(p1, true));
+}
+
 //----------------------------------------------------------------------------//
 
 struct FieldInfo
@@ -177,21 +203,15 @@ MStatus importF3d::doIt(const MArgList &argList)
     }
   }
   
-  std::string tmpDir;
-  #ifdef _WIN32
-  char *ev = getenv("TEMP");
-  if (!ev)
+  std::string cacheDir = ".";
+  size_t ls = pat.find_last_of("\\/");
+  if (ls != std::string::npos)
   {
-    ev = getenv("TMP");
+    cacheDir = pat.substr(0, ls);
   }
-  tmpDir = (ev ? ev : "C:/Windows/Temp");
-  #else
-  tmpDir = "/tmp";
-  #endif
   
   bool xmlOnly = args.isFlagSet("-xmlOnly");
-  bool isTempXml = true;
-  std::string xmlDir = tmpDir;
+  std::string xmlDir = cacheDir;
   std::string xmlBase = "";
   std::string xmlExt = ".xml";
   
@@ -243,8 +263,6 @@ MStatus importF3d::doIt(const MArgList &argList)
       xmlBase += "_";
     }
     
-    isTempXml = false;
-    
     if (verbose)
     {
       MGlobal::displayInfo(MString("importF3d: xmlDir = ") + xmlDir.c_str());
@@ -291,6 +309,8 @@ MStatus importF3d::doIt(const MArgList &argList)
         MGlobal::displayWarning(MString("importF3d: Cannot open file ") + xmlFile.c_str() + " for writing");
         continue;
       }
+      
+      MGlobal::displayInfo(MString("importF3d: Create XML \"") + xmlFile.c_str() + "\"");
       
       MString shapeName = (ns + partition).c_str();
       
@@ -358,7 +378,7 @@ MStatus importF3d::doIt(const MArgList &argList)
       // 
       // don't forget the remapChannels
       
-      // -remapChannels "texture=coord,density=ploff,velocity=v_mac"
+      // -remapChannels "coord=texture,v_mac=velocity"
       
       // Figure out channels !
       unsigned int resolution[3] = {0, 0, 0};
@@ -455,7 +475,8 @@ MStatus importF3d::doIt(const MArgList &argList)
         
         if (channelIt == channels.end())
         {
-          // type doesn't really matter
+          // type doesn't matter for EmptyField, use any
+          
           Field3D::EmptyField<Field3D::V3h>::Vec fields = f3d.readProxyLayer<Field3D::V3h>(partition, info.name, true);
           if (fields.empty())
           {
@@ -528,7 +549,8 @@ MStatus importF3d::doIt(const MArgList &argList)
             }
             
           }
-          // get the matrix and apply a constant offset to 
+          
+          // get the matrix and apply a constant offset too
         }
         else if (channelIt->second.name != info.name)
         {
@@ -553,7 +575,26 @@ MStatus importF3d::doIt(const MArgList &argList)
       fprintf(f, "  <time Range=\"%d-%d\"/>\n", startTime, endTime);
       fprintf(f, "  <cacheTimePerFrame TimePerFrame=\"%d\"/>\n", timePerFrame);
       fprintf(f, "  <cacheVersion Version=\"2.0\"/>\n");
-      fprintf(f, "  <extra>f3d.file=%s</extra>\n", pat.c_str());
+      if (SamePath(xmlDir, cacheDir))
+      {
+        size_t p = pat.find_last_of("\\/");
+        if (p != std::string::npos)
+        {
+          fprintf(f, "  <extra>f3d.file=%s</extra>\n", pat.substr(p+1).c_str());
+        }
+        else
+        {
+          fprintf(f, "  <extra>f3d.file=%s</extra>\n", pat.c_str());
+        }
+      }
+      else
+      {
+        fprintf(f, "  <extra>f3d.file=%s</extra>\n", pat.c_str());
+      }
+      for (std::map<std::string, std::string>::iterator mit = m_remapChannels.begin(); mit != m_remapChannels.end(); ++mit)
+      {
+        fprintf(f, "  <extra>f3d.remap=%s:%s</extra>\n", mit->second.c_str(), mit->first.c_str());
+      }
       fprintf(f, "  <Channels>\n");
       
       int d = 0;
@@ -564,7 +605,7 @@ MStatus importF3d::doIt(const MArgList &argList)
         if (channelIt != channels.end())
         {
           fprintf(f, "    <channel%d ChannelName=\"%s_%s\" ChannelType=\"FloatArray\" ChannelInterpretation=\"%s\" SamplingType=\"Regular\" SamplingRate=\"%d\" StartTime=\"%d\" EndTime=\"%d\"/>\n",
-                  d++, shapeName.asChar(), channelIt->second.name.c_str(), nit->c_str(), timePerFrame, startTime, endTime);
+                  d++, shapeName.asChar(), nit->c_str(), nit->c_str(), timePerFrame, startTime, endTime);
         }
       }
       
@@ -574,7 +615,7 @@ MStatus importF3d::doIt(const MArgList &argList)
         if (channelIt != channels.end())
         {
           fprintf(f, "    <channel%d ChannelName=\"%s_%s\" ChannelType=\"FloatArray\" ChannelInterpretation=\"%s\" SamplingType=\"Regular\" SamplingRate=\"%d\" StartTime=\"%d\" EndTime=\"%d\"/>\n",
-                  d++, shapeName.asChar(), channelIt->second.name.c_str(), nit->c_str(), timePerFrame, startTime, endTime);
+                  d++, shapeName.asChar(), nit->c_str(), nit->c_str(), timePerFrame, startTime, endTime);
         }
       }
       
@@ -619,11 +660,6 @@ MStatus importF3d::doIt(const MArgList &argList)
         cmd += "\", \"xmlcache\", $objects, {}); }";
         
         MGlobal::executeCommand(cmd);
-      }
-      
-      if (isTempXml)
-      {
-        remove(xmlFile.c_str());
       }
     }
     
