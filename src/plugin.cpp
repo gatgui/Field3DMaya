@@ -81,6 +81,14 @@ MStatus initializePlugin( MObject obj )
     return status;
   }
   
+  status = plugin.registerCommand("importF3d", importF3d::creator, importF3d::newSyntax);
+  
+  if (!status)
+  {
+    status.perror( "registerCommand importF3d failed" );
+    return status;
+  }
+  
   Field3D::initIO();
   
   return MStatus::kSuccess;
@@ -95,7 +103,15 @@ MStatus uninitializePlugin( MObject obj )
 {
   MFnPlugin plugin( obj );
   
-  MStatus status = plugin.deregisterCommand("queryF3d");
+  MStatus status = plugin.deregisterCommand("importF3d");
+  
+  if (!status)
+  {
+    status.perror( "deregisterCommand importF3d failed" );
+    return status;
+  }
+  
+  status = plugin.deregisterCommand("queryF3d");
   
   if (!status)
   {

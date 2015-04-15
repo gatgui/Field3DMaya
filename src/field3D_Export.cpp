@@ -91,7 +91,7 @@ using namespace Field3D;
 
 //----------------------------------------------------------------------------//
 
-static void StripWS(std::string &s)
+void StripWS(std::string &s)
 {
   size_t p = s.find_first_not_of(" \t\n");
   
@@ -119,7 +119,7 @@ static void StripWS(std::string &s)
   }
 }
 
-static size_t Split(const std::string &s, char sep, std::vector<std::string> &splits, bool strip=true)
+size_t Split(const std::string &s, char sep, std::vector<std::string> &splits, bool strip=true)
 {
   std::string split;
   

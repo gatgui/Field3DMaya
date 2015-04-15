@@ -178,7 +178,6 @@ size_t GetFileList(const std::string &filePattern, std::vector<std::string> &fil
   return files.size();
 }
 
-
 // ---
 
 void* QueryF3d::creator()
@@ -400,80 +399,26 @@ MStatus QueryF3d::doIt(const MArgList &argList)
         
         MIntArray rv;
         
-        Field3D::EmptyField<Field3D::half>::Vec hfld = f3d.readProxyLayer<Field3D::half>(partition, layer, false);
+        // When reading proxy layers, the type doesn't actually matters
         
-        if (hfld.size() == 0)
+        Field3D::EmptyField<Field3D::half>::Vec fields = f3d.readProxyLayer<Field3D::half>(partition, layer, false);
+        
+        if (fields.size() == 0)
         {
-          hfld = f3d.readProxyLayer<Field3D::half>(partition, layer, true);
-          if (verbose && hfld.size() > 0)
+          fields = f3d.readProxyLayer<Field3D::half>(partition, layer, true);
+          if (verbose && fields.size() > 0)
           {
-            MGlobal::displayInfo("(vector-half field)");
+            MGlobal::displayInfo("(vector field)");
           }
         }
         else if (verbose)
         {
-          MGlobal::displayInfo("(scalar-half field)");
+          MGlobal::displayInfo("(scalar field)");
         }
         
-        if (hfld.size() > 0)
+        if (fields.size() > 0)
         {
-          Field3D::V3i res = hfld[0]->dataResolution();
-          
-          rv.append(res.x);
-          rv.append(res.y);
-          rv.append(res.z);
-          
-          setResult(rv);
-          
-          return MS::kSuccess;
-        }
-        
-        Field3D::EmptyField<float>::Vec ffld = f3d.readProxyLayer<float>(partition, layer, false);
-        
-        if (ffld.size() == 0)
-        {
-          ffld = f3d.readProxyLayer<float>(partition, layer, true);
-          if (verbose && ffld.size() > 0)
-          {
-            MGlobal::displayInfo("(vector-float field)");
-          }
-        }
-        else if (verbose)
-        {
-          MGlobal::displayInfo("(scalar-float field)");
-        }
-        
-        if (ffld.size() > 0)
-        {
-          Field3D::V3i res = ffld[0]->dataResolution();
-          
-          rv.append(res.x);
-          rv.append(res.y);
-          rv.append(res.z);
-          
-          setResult(rv);
-          
-          return MS::kSuccess;
-        }
-        
-        Field3D::EmptyField<double>::Vec dfld = f3d.readProxyLayer<double>(partition, layer, false);
-        
-        if (dfld.size() == 0)
-        {
-          dfld = f3d.readProxyLayer<double>(partition, layer, true);
-          if (verbose && dfld.size() > 0)
-          {
-            MGlobal::displayInfo("(vector-double field)");
-          }
-        }
-        else if (verbose)
-        {
-          MGlobal::displayInfo("(scalar-double field)");
-        }
-        
-        if (dfld.size() > 0)
-        {
-          Field3D::V3i res = dfld[0]->dataResolution();
+          Field3D::V3i res = fields[0]->dataResolution();
           
           rv.append(res.x);
           rv.append(res.y);
