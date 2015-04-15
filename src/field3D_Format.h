@@ -141,6 +141,29 @@ private:
    
    FileAccessMode m_mode;
    
+   struct SequenceDesc
+   {
+      std::string dir;
+      std::string filePattern;
+      bool useSubFrames;
+      std::map<std::string, std::string> mapChannels; // maya name -> field3d name
+      std::map<std::string, std::string> unmapChannels; // field3d name -> maya name
+      
+      SequenceDesc()
+         : useSubFrames(false)
+      {
+      }
+      
+      void clear()
+      {
+         mapChannels.clear();
+         unmapChannels.clear();
+         dir = "";
+         filePattern = "";
+         useSubFrames = false;
+      }
+   };
+   
    std::map<MTime, MString> m_inSeq;
    std::map<MTime, MString>::iterator m_inCurFile;
    Field3DInputFile *m_inFile;
@@ -151,8 +174,7 @@ private:
    Field3D::V3i m_inResolution;
    Field3D::V3f m_inOffset;
    Field3D::V3f m_inDimension;
-   std::map<std::string, std::string> m_inMapChannels; // maya name -> field3d name
-   std::map<std::string, std::string> m_inUnmapChannels; // field3d name -> maya name
+   SequenceDesc m_inDesc;
    std::map<std::string, Field3DTools::Fld>::iterator m_inCurField;
    std::map<std::string, Field3DTools::Fld>::iterator m_inNextField;
    
@@ -163,6 +185,7 @@ private:
    MFnFluid m_outFluid;
    float m_outOffset[3];
    
+   bool readDescription(const std::string &xmlPath, SequenceDesc &desc);
    bool identifyPath(const MString &path, MString &dirname, MString &basename, MString &frame, MTime &t, MString &ext);
    unsigned long fillCacheFiles(const MString &path);
    unsigned long fillCacheFiles(const MString &dirname, const MString &basename, const MString &ext);

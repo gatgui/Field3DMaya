@@ -44,9 +44,11 @@
 #include <maya/MStatus.h>
 #include <maya/MMatrix.h>
 #include <maya/MGlobal.h>
+#include <maya/MCacheFormatDescription.h>
 
 #include <iostream>
 #include <sstream>
+#include <fstream>
 
 static std::string extractFluidName(const MString &name)
 {
@@ -319,9 +321,28 @@ unsigned long Field3dCacheFormat::fillCacheFiles(const MString &dirname, const M
    
    MString _dn, _bn, _fn, _e;
    MTime t;
+   int f, sf;
    
    for (unsigned long i=0; i<tmp.length(); ++i)
    {
+      if (m_inDesc.filePattern.length() > 0)
+      {
+         if (m_inDesc.useSubFrames)
+         {
+            if (sscanf(tmp[i].asChar(), m_inDesc.filePattern.c_str(), &f, &sf) != 2)
+            {
+               continue;
+            }
+         }
+         else
+         {
+            if (sscanf(tmp[i].asChar(), m_inDesc.filePattern.c_str(), &f) != 1)
+            {
+               continue;
+            }
+         }
+      }
+      
       if (identifyPath(tmp[i], _dn, _bn, _fn, t, _e))
       {
          m_inSeq[t] = mdn + tmp[i];
@@ -341,10 +362,6 @@ void Field3dCacheFormat::resetInputFile()
    
    m_inFluidName = "";
    m_inPartition = "";
-   
-   // Note: Want to read that from .xml <extra> tags but readDescription is not called...
-   m_inMapChannels.clear();
-   m_inUnmapChannels.clear();
    
    m_inResolution = Field3D::V3i(0, 0, 0);
    m_inOffset = Field3D::V3f(0.0f, 0.0f, 0.0f);
@@ -378,11 +395,32 @@ MStatus Field3dCacheFormat::open(const MString &fileName, FileAccessMode mode)
       
       if (inFilename != m_inFilename)
       {
-         // this is a difference file sequence
-         resetInputFile();
+         SequenceDesc desc;
          
-         m_inFilename = inFilename;
-         fillCacheFiles(fileName);
+         readDescription(inFilename + ".xml", desc);
+                  
+         if (desc.dir.length() > 0)
+         {
+            inFilename = desc.dir + "/" + bn.asChar();
+            dn = desc.dir.c_str();
+         }
+         
+         // re-evaluate inFilename
+         
+         if (inFilename != m_inFilename)
+         {
+            m_inDesc = desc;
+            
+            // this is a difference file sequence
+            resetInputFile();
+            
+            m_inFilename = inFilename;
+            
+            // don't use fileName as directory may have changed
+            // basename should stay identical whatever the frame pattern is
+            
+            fillCacheFiles(dn, bn, ext);
+         }
       }
       
       std::map<MTime, MString>::iterator it = m_inSeq.find(t);
@@ -867,8 +905,8 @@ MStatus Field3dCacheFormat::findChannelName(const MString &name)
    }
    
    // map maya name to field3d name
-   std::map<std::string, std::string>::iterator rit = m_inMapChannels.find(channel);
-   if (rit != m_inMapChannels.end())
+   std::map<std::string, std::string>::iterator rit = m_inDesc.mapChannels.find(channel);
+   if (rit != m_inDesc.mapChannels.end())
    {
       channel = rit->second;
    }
@@ -896,8 +934,8 @@ MStatus Field3dCacheFormat::readChannelName(MString &name)
       std::string channel = m_inCurField->first;
       
       // map field3d name to maya name
-      std::map<std::string, std::string>::iterator rit = m_inUnmapChannels.find(channel);
-      if (rit != m_inUnmapChannels.end())
+      std::map<std::string, std::string>::iterator rit = m_inDesc.unmapChannels.find(channel);
+      if (rit != m_inDesc.unmapChannels.end())
       {
          channel = rit->second;
       }
@@ -1108,6 +1146,133 @@ MStatus Field3dCacheFormat::readArray(T &array, unsigned long arraySize)
    
    return (success ? MS::kSuccess : MS::kFailure);
 }
+
+bool Field3dCacheFormat::readDescription(const std::string &xmlPath, Field3dCacheFormat::SequenceDesc &desc)
+{
+   std::ifstream is(xmlPath.c_str());
+   
+   if (!is.is_open())
+   {
+      return false;
+   }
+   else
+   {
+      MGlobal::displayInfo(MString("Reading cache description \"") + xmlPath.c_str() + "\"");
+      bool inExtra = false;
+      std::string line;
+      std::string extra;
+      
+      // supposes we don't have twice the <extra> tag on the same line
+      
+      while (is.good())
+      {
+         std::getline(is, line);
+         
+         if (inExtra)
+         {
+            size_t p0 = line.find("</extra>");
+            
+            if (p0 != std::string::npos)
+            {
+               extra += line.substr(0, p0);
+               inExtra = false;
+            }
+            else
+            {
+               extra += line + "\n";
+            }
+         }
+         else
+         {
+            size_t p0 = line.find("<extra>");
+            
+            if (p0 != std::string::npos)
+            {
+               p0 += strlen("<extra>");
+               
+               size_t p1 = line.find("</extra>", p0);
+               
+               if (p1 == std::string::npos)
+               {
+                  extra = line.substr(p0) + "\n";
+                  inExtra = true;
+               }
+               else
+               {
+                  extra = line.substr(p0, p1 - p0);
+               }
+            }
+         }
+         
+         if (inExtra == false && extra.length() > 0)
+         {
+            size_t p = extra.find("f3d.file=");
+         
+            if (p != std::string::npos)
+            {
+               desc.filePattern = extra.substr(p + strlen("f3d.file="));
+               
+               size_t n = std::count(desc.filePattern.begin(), desc.filePattern.end(), '%');
+               
+               if (n == 0 || n > 2)
+               {
+                  MGlobal::displayWarning(MString("  Ignoring file pattern: ") + desc.filePattern.c_str());
+                  desc.filePattern = "";
+               }
+               else
+               {
+                  desc.useSubFrames = (n == 2);
+                  
+                  size_t p = desc.filePattern.find_last_of("\\/");
+                  if (p != std::string::npos)
+                  {
+                     desc.dir = desc.filePattern.substr(0, p);
+                     desc.filePattern = desc.filePattern.substr(p + 1);
+                  }
+                  else
+                  {
+                     desc.dir = "";
+                  }
+                  
+                  MGlobal::displayInfo(MString("  File pattern: ") + desc.filePattern.c_str() + " (in directory: \"" + desc.dir.c_str() + "\")");
+               }
+            }
+            else
+            {
+               // f3d.remap=texture:coord
+               // f3d.remap=velocity:v_mac
+               p = extra.find("f3d.remap=");
+               
+               if (p != std::string::npos)
+               {
+                  std::string remap = extra.substr(p + strlen("f3d.remap="));
+                  p = remap.find(':');
+                  
+                  if (p != std::string::npos)
+                  {
+                     std::string mayaName = remap.substr(0, p);
+                     
+                     if (mayaName != "resolution" && mayaName != "offset")
+                     {
+                        std::string f3dName = remap.substr(p+1);
+                        
+                        MGlobal::displayInfo(MString("  Remap channel \"") + mayaName.c_str() + "\" -> \"" + f3dName.c_str() + "\"");
+                        
+                        desc.mapChannels[mayaName] = f3dName;
+                        desc.unmapChannels[f3dName] = mayaName;
+                     }
+                  }
+               }
+            }
+            
+            extra = "";
+         }
+      }
+      
+      return true;
+   }
+}
+
 
 bool Field3dCacheFormat::handlesDescription()
 {
