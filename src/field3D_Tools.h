@@ -76,7 +76,7 @@ struct FieldTraits<Field3D::SparseField<DataType> >
    
    static void SetSparseBlockOrder(typename FieldType::Ptr field, int order)
    {
-      if (field && order > 0)
+      if (field && order > 0 && order != field->blockOrder())
       {
          field->setBlockOrder(order);
       }
@@ -89,13 +89,13 @@ struct FieldTraits<Field3D::SparseField<DataType> >
          return;
       }
       
-      int n = field->blockSize();
+      Field3D::V3i res = field->blockRes();
       
-      for (int x=0; x<n; ++x)
+      for (int x=0; x<res.x; ++x)
       {
-         for (int y=0; y<n; ++y)
+         for (int y=0; y<res.y; ++y)
          {
-            for (int z=0; z<n; ++z)
+            for (int z=0; z<res.z; ++z)
             {
                field->setBlockEmptyValue(x, y, z, value);
             }

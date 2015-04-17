@@ -283,7 +283,7 @@ MStatus exportF3d::parseArgs( const MArgList &args )
       "                                           only writes out whole frame sim data\n"
       "    -sp    -sparse              bool     Output sparse field or not (false by default)\n"    
       "    -spt   -sparseThreshold     float    Sparse field threshold (0.0000001 by default)\n"
-      "    -sbo   -sparseBlockOrder    int      Sparse block order (4 by default for 16x16x16 blocks)\n"
+      "    -sbo   -sparseBlockOrder    int      Sparse block order (4 by default for blocks of up to 16x16x16 voxels)\n"
       "    -ssd   -sparseScalarDefault float    Sparse block default value for scalar fields (0 by default)\n"
       "    -svd   -sparseVectorDefault float3   Sparse block default value for vector fields (0, 0, 0 by default)\n"
       "    -hf    -half                bool     Output half float fields or not (false by default)\n"
