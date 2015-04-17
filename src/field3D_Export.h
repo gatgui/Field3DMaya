@@ -59,6 +59,10 @@ private:
   bool           m_ignoreFalloff;
   bool           m_sparse;
   bool           m_half;
+  double         m_sparseThreshold;
+  int            m_sparseBlockOrder;
+  double         m_sparseScalarDefault;
+  double         m_sparseVectorDefault[3];
   std::map<std::string, std::string> m_remapChannels;
 };
 

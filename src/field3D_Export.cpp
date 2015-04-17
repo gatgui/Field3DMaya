@@ -73,6 +73,8 @@
 #include <Field3D/Field3DFile.h>
 #include <Field3D/InitIO.h>
 
+#include "field3D_Tools.h"
+
 #include <maya/MComputation.h>
 
 #define ERRCHKR   \
@@ -198,6 +200,12 @@ exportF3d::exportF3d()
   m_forNCache = false;
   
   m_sparse = false;
+  m_sparseBlockOrder = 4;
+  m_sparseThreshold = Field3DTools::SPARSE_THRESHOLD;
+  m_sparseScalarDefault = 0.0;
+  m_sparseVectorDefault[0] = 0.0;
+  m_sparseVectorDefault[1] = 0.0;
+  m_sparseVectorDefault[2] = 0.0;
   m_half = false;
 }
 
@@ -228,6 +236,10 @@ MSyntax exportF3d::newSyntax()
   stat = syntax.addFlag("-ns",  "-numOversample", MSyntax::kLong); ERRCHK; 
   stat = syntax.addFlag("-fnc", "-forNCache", MSyntax::kNoArg); ERRCHK;
   stat = syntax.addFlag("-sp",  "-sparse", MSyntax::kBoolean); ERRCHK;
+  stat = syntax.addFlag("-spt", "-sparseThreshold", MSyntax::kDouble); ERRCHK;
+  stat = syntax.addFlag("-sbo", "-sparseBlockOrder", MSyntax::kLong); ERRCHK;
+  stat = syntax.addFlag("-ssd", "-sparseScalarDefault", MSyntax::kDouble); ERRCHK;
+  stat = syntax.addFlag("-svd", "-sparseVectorDefault", MSyntax::kDouble, MSyntax::kDouble, MSyntax::kDouble); ERRCHK;
   stat = syntax.addFlag("-hf",  "-half", MSyntax::kBoolean); ERRCHK;
   stat = syntax.addFlag("-rc",  "-remapChannels", MSyntax::kString); ERRCHK;
   
@@ -255,27 +267,31 @@ MStatus exportF3d::parseArgs( const MArgList &args )
       "\nexportF3d is used to export 3D fluid data to either f3d\n"
       "Synopsis: exportF3d [flags] [fluidObject... ]\n"
       "Flags:\n"
-      "    -od    -outputDir    string  Output directory\n"
-      "    -on    -outputName   string  Output base name (can contain printf like frame pattern)\n"
-      "    -st    -startTime    int     Start of simulation\n"
-      "    -et    -endTime      int     End of simulation\n"
-      "    -id    -ignoreDensity        Don't output 'density' field\n"
-      "    -itm   -ignoreTemperature    Don't output 'temperature' field\n"
-      "    -ifu   -ignoreFuel           Don't output 'fuel' field\n"
-      "    -iv    -ignoreVelocity       Don't output 'velocity' field\n"
-      "    -ic    -ignoreColor          Don't output 'color' field\n"
-      "    -itx   -ignoreTexture        Don't output 'texture' field\n"
-      "    -ifa   -ignoreFalloff        Don't output 'falloff' field\n"
-      "    -ap    -addPressure          Output 'pressure' field\n"
-      "    -ns    -numOversample int    Oversamples the solver with N sub frame(s) but\n"
-      "                                   only writes out whole frame sim data\n"
-      "    -sp    -sparse       bool    Outut sparse field or not (false by default)\n"    
-      "    -hf    -half         bool    Outut half float fields or not (false by default)\n"
-      "    -rc    -remapChannels string Remap fluid channels (',' separated list of oldName=newName)\n"
-      "                                   (default is 'velocity=v_mac,color=Cd,texture=coord'\n"
-      "    -fnc   -forNCache            Format file and field names to be nCache compatible\n"
-      "                                   Overrides output filename to <outputDir>/<outputName>Frame<frame>.f3d\n"
-      "                                   Note: default channel name remapping is ignored\n"
+      "    -od    -outputDir           string   Output directory\n"
+      "    -on    -outputName          string   Output base name (can contain printf like frame pattern)\n"
+      "    -st    -startTime           int      Start of simulation\n"
+      "    -et    -endTime             int      End of simulation\n"
+      "    -id    -ignoreDensity                Don't output 'density' field\n"
+      "    -itm   -ignoreTemperature            Don't output 'temperature' field\n"
+      "    -ifu   -ignoreFuel                   Don't output 'fuel' field\n"
+      "    -iv    -ignoreVelocity               Don't output 'velocity' field\n"
+      "    -ic    -ignoreColor                  Don't output 'color' field\n"
+      "    -itx   -ignoreTexture                Don't output 'texture' field\n"
+      "    -ifa   -ignoreFalloff                Don't output 'falloff' field\n"
+      "    -ap    -addPressure                  Output 'pressure' field\n"
+      "    -ns    -numOversample       int      Oversamples the solver with N sub frame(s) but\n"
+      "                                           only writes out whole frame sim data\n"
+      "    -sp    -sparse              bool     Output sparse field or not (false by default)\n"    
+      "    -spt   -sparseThreshold     float    Sparse field threshold (0.0000001 by default)\n"
+      "    -sbo   -sparseBlockOrder    int      Sparse block order (4 by default for 16x16x16 blocks)\n"
+      "    -ssd   -sparseScalarDefault float    Sparse block default value for scalar fields (0 by default)\n"
+      "    -svd   -sparseVectorDefault float3   Sparse block default value for vector fields (0, 0, 0 by default)\n"
+      "    -hf    -half                bool     Output half float fields or not (false by default)\n"
+      "    -rc    -remapChannels       string   Remap fluid channels (',' separated list of oldName=newName)\n"
+      "                                           (default is 'velocity=v_mac,color=Cd,texture=coord'\n"
+      "    -fnc   -forNCache                    Format file and field names to be nCache compatible\n"
+      "                                           Overrides output filename to <outputDir>/<outputName>Frame<frame>.f3d\n"
+      "                                           Note: default channel name remapping is ignored\n"
       "    -d     -debug\n"
       "    -h     -help\n"
       "Example:\n"
@@ -344,6 +360,28 @@ MStatus exportF3d::parseArgs( const MArgList &args )
   if (argData.isFlagSet("-sparse"))
   {
     argData.getFlagArgument("-sparse", 0, m_sparse);
+  }
+  
+  if (m_sparse)
+  {
+    if (argData.isFlagSet("-sparseThreshold"))
+    {
+      argData.getFlagArgument("-sparseThreshold", 0, m_sparseThreshold);
+    }
+    if (argData.isFlagSet("-sparseBlockOrder"))
+    {
+      argData.getFlagArgument("-sparseBlockOrder", 0, m_sparseBlockOrder);
+    }
+    if (argData.isFlagSet("-sparseScalarDefault"))
+    {
+      argData.getFlagArgument("-sparseScalarDefault", 0, m_sparseScalarDefault);
+    }
+    if (argData.isFlagSet("-sparseVectorDefault"))
+    {
+      argData.getFlagArgument("-sparseVectorDefault", 0, m_sparseVectorDefault[0]);
+      argData.getFlagArgument("-sparseVectorDefault", 1, m_sparseVectorDefault[1]);
+      argData.getFlagArgument("-sparseVectorDefault", 2, m_sparseVectorDefault[2]);
+    }
   }
   
   if (argData.isFlagSet("-half"))
@@ -799,6 +837,9 @@ void exportF3d::setF3dField(MFnFluid &fluidFn, const char *outputPath,
   try
   { 
     MStatus stat;
+    
+    bool ssparse = Field3DTools::FieldTraits<FField>::IsSparse;
+    bool vsparse = Field3DTools::FieldTraits<VField>::IsSparse;
 
     unsigned int i, xres = 0, yres = 0, zres = 0;
     double xdim, ydim, zdim;
@@ -935,6 +976,11 @@ void exportF3d::setF3dField(MFnFluid &fluidFn, const char *outputPath,
     typedef typename VField::value_type VectorType;
     typedef typename VectorType::BaseType ComponentType;
     
+    ScalarType sBlockDefault = (ScalarType) m_sparseScalarDefault;
+    VectorType vBlockDefault = VectorType((ComponentType) m_sparseVectorDefault[0],
+                                          (ComponentType) m_sparseVectorDefault[1],
+                                          (ComponentType) m_sparseVectorDefault[2]);
+    
     
     MPlug autoResizePlug = fluidFn.findPlug("autoResize", &stat); 
     bool autoResize;
@@ -976,6 +1022,11 @@ void exportF3d::setF3dField(MFnFluid &fluidFn, const char *outputPath,
       densityFld->setMapping(mapping);
       densityFld->metadata().setVecFloatMetadata("Offset", Offset);
       densityFld->metadata().setVecFloatMetadata("Dimension", Dimension);
+      if (ssparse)
+      {
+        Field3DTools::FieldTraits<FField>::SetSparseBlockOrder(densityFld, m_sparseBlockOrder);
+        Field3DTools::FieldTraits<FField>::SetSparseBlockDefault(densityFld, sBlockDefault);
+      }
     }
     
     if (m_hasFuel)
@@ -985,6 +1036,11 @@ void exportF3d::setF3dField(MFnFluid &fluidFn, const char *outputPath,
       fuelFld->setMapping(mapping);
       fuelFld->metadata().setVecFloatMetadata("Offset", Offset);
       fuelFld->metadata().setVecFloatMetadata("Dimension", Dimension);
+      if (ssparse)
+      {
+        Field3DTools::FieldTraits<FField>::SetSparseBlockOrder(fuelFld, m_sparseBlockOrder);
+        Field3DTools::FieldTraits<FField>::SetSparseBlockDefault(fuelFld, sBlockDefault);
+      }
     }
     
     if (m_hasTemperature)
@@ -994,6 +1050,11 @@ void exportF3d::setF3dField(MFnFluid &fluidFn, const char *outputPath,
       tempFld->setMapping(mapping);
       tempFld->metadata().setVecFloatMetadata("Offset", Offset);
       tempFld->metadata().setVecFloatMetadata("Dimension", Dimension);
+      if (ssparse)
+      {
+        Field3DTools::FieldTraits<FField>::SetSparseBlockOrder(tempFld, m_sparseBlockOrder);
+        Field3DTools::FieldTraits<FField>::SetSparseBlockDefault(tempFld, sBlockDefault);
+      }
     }
     
     if (m_hasPressure)
@@ -1003,6 +1064,11 @@ void exportF3d::setF3dField(MFnFluid &fluidFn, const char *outputPath,
       pressureFld->setMapping(mapping);
       pressureFld->metadata().setVecFloatMetadata("Offset", Offset);
       pressureFld->metadata().setVecFloatMetadata("Dimension", Dimension);
+      if (ssparse)
+      {
+        Field3DTools::FieldTraits<FField>::SetSparseBlockOrder(pressureFld, m_sparseBlockOrder);
+        Field3DTools::FieldTraits<FField>::SetSparseBlockDefault(pressureFld, sBlockDefault);
+      }
     }
     
     if (m_hasFalloff)
@@ -1012,6 +1078,11 @@ void exportF3d::setF3dField(MFnFluid &fluidFn, const char *outputPath,
       falloffFld->setMapping(mapping);
       falloffFld->metadata().setVecFloatMetadata("Offset", Offset);
       falloffFld->metadata().setVecFloatMetadata("Dimension", Dimension);
+      if (ssparse)
+      {
+        Field3DTools::FieldTraits<FField>::SetSparseBlockOrder(falloffFld, m_sparseBlockOrder);
+        Field3DTools::FieldTraits<FField>::SetSparseBlockDefault(falloffFld, sBlockDefault);
+      }
     }
     
     if (m_hasVelocity)
@@ -1030,6 +1101,11 @@ void exportF3d::setF3dField(MFnFluid &fluidFn, const char *outputPath,
       CdFld->setMapping(mapping);
       CdFld->metadata().setVecFloatMetadata("Offset", Offset);
       CdFld->metadata().setVecFloatMetadata("Dimension", Dimension);
+      if (vsparse)
+      {
+        Field3DTools::FieldTraits<VField>::SetSparseBlockOrder(CdFld, m_sparseBlockOrder);
+        Field3DTools::FieldTraits<VField>::SetSparseBlockDefault(CdFld, vBlockDefault);
+      }
     } 
     
     if (m_hasTexture)
@@ -1039,6 +1115,11 @@ void exportF3d::setF3dField(MFnFluid &fluidFn, const char *outputPath,
       uvwFld->setMapping(mapping);
       uvwFld->metadata().setVecFloatMetadata("Offset", Offset);
       uvwFld->metadata().setVecFloatMetadata("Dimension", Dimension);
+      if (vsparse)
+      {
+        Field3DTools::FieldTraits<VField>::SetSparseBlockOrder(uvwFld, m_sparseBlockOrder);
+        Field3DTools::FieldTraits<VField>::SetSparseBlockDefault(uvwFld, vBlockDefault);
+      }
     } 
         
     size_t iX, iY, iZ;      
@@ -1051,37 +1132,37 @@ void exportF3d::setF3dField(MFnFluid &fluidFn, const char *outputPath,
           /// data is in x major but we are writting in z major order
           i = fluidFn.index(iX, iY, iZ);
             
-          if (m_hasDensity) 
+          if (m_hasDensity && (!ssparse || density[i] > m_sparseThreshold))
           {
             densityFld->fastLValue(iX, iY, iZ) = (ScalarType) density[i];
           }
           
-          if (m_hasTemperature)
+          if (m_hasTemperature && (!ssparse || temp[i] > m_sparseThreshold))
           {
             tempFld->fastLValue(iX, iY, iZ) = (ScalarType) temp[i];
           }
           
-          if (m_hasFuel)
+          if (m_hasFuel && (!ssparse || fuel[i] > m_sparseThreshold))
           {
             fuelFld->fastLValue(iX, iY, iZ) = (ScalarType) fuel[i];
           }
           
-          if (m_hasPressure)
+          if (m_hasPressure && (!ssparse || pressure[i] > m_sparseThreshold))
           {
             pressureFld->fastLValue(iX, iY, iZ) = (ScalarType) pressure[i];
           }
           
-          if (m_hasFalloff)
+          if (m_hasFalloff && (!ssparse || falloff[i] > m_sparseThreshold))
           {
             falloffFld->fastLValue(iX, iY, iZ) = (ScalarType) falloff[i];
           }
           
-          if (m_hasColor)
+          if (m_hasColor && (!vsparse || (r[i]*r[i] + g[i]*g[i] + b[i]*b[i] > m_sparseThreshold)))
           {
             CdFld->fastLValue(iX, iY, iZ) = VectorType((ComponentType)r[i], (ComponentType)g[i], (ComponentType)b[i]);
           }
           
-          if (m_hasTexture)
+          if (m_hasTexture && (!vsparse || (u[i]*u[i] + v[i]*v[i] + (w ? w[i]*w[i] : 0.0f) > m_sparseThreshold)))
           {
             // can be a 2D fluid
             uvwFld->fastLValue(iX, iY, iZ) = VectorType((ComponentType)u[i], (ComponentType)v[i], (ComponentType)(w ? w[i] : 0.0f));

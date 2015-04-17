@@ -49,7 +49,62 @@
 namespace Field3DTools
 {
 
-const float SPARSE_THRESHOLD = 0.0000001 ;
+const float SPARSE_THRESHOLD = 0.0000001f ;
+
+
+template <typename FieldType>
+struct FieldTraits
+{
+   static const bool IsSparse = false;
+   
+   static void SetSparseBlockOrder(typename FieldType::Ptr, int)
+   {
+   }
+   
+   template <typename DataType>
+   static void SetSparseBlockDefault(typename FieldType::Ptr, const DataType &)
+   {
+   }
+};
+
+template <typename DataType>
+struct FieldTraits<Field3D::SparseField<DataType> >
+{
+   typedef typename Field3D::SparseField<DataType> FieldType;
+   
+   static const bool IsSparse = true;
+   
+   static void SetSparseBlockOrder(typename FieldType::Ptr field, int order)
+   {
+      if (field && order > 0)
+      {
+         field->setBlockOrder(order);
+      }
+   }
+   
+   static void SetSparseBlockDefault(typename FieldType::Ptr field, const DataType &value)
+   {
+      if (!field)
+      {
+         return;
+      }
+      
+      int n = field->blockSize();
+      
+      for (int x=0; x<n; ++x)
+      {
+         for (int y=0; y<n; ++y)
+         {
+            for (int z=0; z<n; ++z)
+            {
+               field->setBlockEmptyValue(x, y, z, value);
+            }
+         }
+      }
+   }
+};
+
+
 
 enum SupportedFieldTypeEnum
 {
@@ -573,7 +628,9 @@ bool writeSparseScalarField(Field3D::Field3DOutputFile *out,
 {
    // field declaration
    typename Field3D::SparseField<ExportType>::Ptr field = new Field3D::SparseField<ExportType>();
-
+   
+   // leave block order and empty value to defaults
+   
    // properties
    Field3DTools::setFieldProperties(*field.get(), fluidName, fieldName, transform);
 
@@ -588,7 +645,10 @@ bool writeSparseScalarField(Field3D::Field3DOutputFile *out,
          {
             ExportType val = (ExportType) data[i + res[0] * (j + res[1] * k)];
             
-            field->fastLValue(i, j, k) = val;
+            if (val > SPARSE_THRESHOLD)
+            {
+               field->fastLValue(i, j, k) = val;
+            }
          }
       }
    }
@@ -686,6 +746,8 @@ bool writeSparseVectorField(Field3D::Field3DOutputFile *out,
    // field declaration
    typename Field3D::SparseField<FIELD3D_VEC3_T<ExportType> >::Ptr field = new Field3D::SparseField<FIELD3D_VEC3_T<ExportType> >();
    
+   // leave block order and empty value to defaults
+   
    // setup X, Y and Z field base offsets
    unsigned int nvoxels = res[0] * res[1] * res[2];
    
@@ -718,8 +780,11 @@ bool writeSparseVectorField(Field3D::Field3DOutputFile *out,
             ExportType a = (ExportType) data[xbase + off];
             ExportType b = (ExportType) data[ybase + off];
             ExportType c = (ExportType) (is3D ? data[zbase + off] : 0.0f);
-
-            field->fastLValue(i, j, k) = Imath::Vec3<ExportType>(a, b, c);
+            
+            if (a*a + b*b + c*c > SPARSE_THRESHOLD)
+            {
+               field->fastLValue(i, j, k) = Imath::Vec3<ExportType>(a, b, c);
+            }
          }
       }
    }
