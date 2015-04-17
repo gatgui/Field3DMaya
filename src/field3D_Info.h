@@ -15,7 +15,23 @@ public:
    
    static MObject aFilename;
    static MObject aTime;
+   static MObject aPartition;
+   static MObject aField;
+   static MObject aOverrideOffset;
+   static MObject aOffset;
+   static MObject aOverrideDimension;
+   static MObject aDimension;
+   static MObject aTransformMode;
    
+   static MObject aOutPartitions;
+   static MObject aOutFields;
+   static MObject aOutResolution;
+   static MObject aOutHasDimension;
+   static MObject aOutDimension;
+   static MObject aOutHasOffset;
+   static MObject aOutOffset;
+   static MObject aOutMatrix;
+   // same as matrix but decomposed
    static MObject aOutScale;
    static MObject aOutScaleX;
    static MObject aOutScaleY;

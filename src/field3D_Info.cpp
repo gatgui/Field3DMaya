@@ -12,47 +12,64 @@
 
 using namespace Field3D;
 
-MTypeId Field3DVRayMatrix::id(0x5E5FE);
+MTypeId Field3DInfo::id(0x5E5FE);
 
-MObject Field3DVRayMatrix::aFilename;
-MObject Field3DVRayMatrix::aTime;
-MObject Field3DVRayMatrix::aOutScale;
-MObject Field3DVRayMatrix::aOutScaleX;
-MObject Field3DVRayMatrix::aOutScaleY;
-MObject Field3DVRayMatrix::aOutScaleZ;
-MObject Field3DVRayMatrix::aOutScalePivot;
-MObject Field3DVRayMatrix::aOutScalePivotX;
-MObject Field3DVRayMatrix::aOutScalePivotY;
-MObject Field3DVRayMatrix::aOutScalePivotZ;
-MObject Field3DVRayMatrix::aOutScalePivotTranslate;
-MObject Field3DVRayMatrix::aOutScalePivotTranslateX;
-MObject Field3DVRayMatrix::aOutScalePivotTranslateY;
-MObject Field3DVRayMatrix::aOutScalePivotTranslateZ;
-MObject Field3DVRayMatrix::aOutRotate;
-MObject Field3DVRayMatrix::aOutRotateX;
-MObject Field3DVRayMatrix::aOutRotateY;
-MObject Field3DVRayMatrix::aOutRotateZ;
-MObject Field3DVRayMatrix::aOutRotatePivot;
-MObject Field3DVRayMatrix::aOutRotatePivotX;
-MObject Field3DVRayMatrix::aOutRotatePivotY;
-MObject Field3DVRayMatrix::aOutRotatePivotZ;
-MObject Field3DVRayMatrix::aOutRotatePivotTranslate;
-MObject Field3DVRayMatrix::aOutRotatePivotTranslateX;
-MObject Field3DVRayMatrix::aOutRotatePivotTranslateY;
-MObject Field3DVRayMatrix::aOutRotatePivotTranslateZ;
-MObject Field3DVRayMatrix::aOutRotateOrder;
-MObject Field3DVRayMatrix::aOutRotateAxis;
-MObject Field3DVRayMatrix::aOutRotateAxisX;
-MObject Field3DVRayMatrix::aOutRotateAxisY;
-MObject Field3DVRayMatrix::aOutRotateAxisZ;
-MObject Field3DVRayMatrix::aOutShear;
-MObject Field3DVRayMatrix::aOutShearXY;
-MObject Field3DVRayMatrix::aOutShearXZ;
-MObject Field3DVRayMatrix::aOutShearYZ;
-MObject Field3DVRayMatrix::aOutTranslate;
-MObject Field3DVRayMatrix::aOutTranslateX;
-MObject Field3DVRayMatrix::aOutTranslateY;
-MObject Field3DVRayMatrix::aOutTranslateZ;
+MObject Field3DInfo::aFilename;
+MObject Field3DInfo::aTime;
+MObject Field3DInfo::aPartition;
+MObject Field3DInfo::aField;
+MObject Field3DInfo::aOverrideOffset;
+MObject Field3DInfo::aOffset;
+MObject Field3DInfo::aOverrideDimension;
+MObject Field3DInfo::aDimension;
+MObject Field3DInfo::aTransformMode;
+
+MObject Field3DInfo::aOutPartitions;
+MObject Field3DInfo::aOutFields;
+MObject Field3DInfo::aOutResolution;
+MObject Field3DInfo::aOutHasDimension;
+MObject Field3DInfo::aOutDimension;
+MObject Field3DInfo::aOutHasOffset;
+MObject Field3DInfo::aOutOffset;
+MObject Field3DInfo::aOutMatrix;
+
+MObject Field3DInfo::aOutScale;
+MObject Field3DInfo::aOutScaleX;
+MObject Field3DInfo::aOutScaleY;
+MObject Field3DInfo::aOutScaleZ;
+MObject Field3DInfo::aOutScalePivot;
+MObject Field3DInfo::aOutScalePivotX;
+MObject Field3DInfo::aOutScalePivotY;
+MObject Field3DInfo::aOutScalePivotZ;
+MObject Field3DInfo::aOutScalePivotTranslate;
+MObject Field3DInfo::aOutScalePivotTranslateX;
+MObject Field3DInfo::aOutScalePivotTranslateY;
+MObject Field3DInfo::aOutScalePivotTranslateZ;
+MObject Field3DInfo::aOutRotate;
+MObject Field3DInfo::aOutRotateX;
+MObject Field3DInfo::aOutRotateY;
+MObject Field3DInfo::aOutRotateZ;
+MObject Field3DInfo::aOutRotatePivot;
+MObject Field3DInfo::aOutRotatePivotX;
+MObject Field3DInfo::aOutRotatePivotY;
+MObject Field3DInfo::aOutRotatePivotZ;
+MObject Field3DInfo::aOutRotatePivotTranslate;
+MObject Field3DInfo::aOutRotatePivotTranslateX;
+MObject Field3DInfo::aOutRotatePivotTranslateY;
+MObject Field3DInfo::aOutRotatePivotTranslateZ;
+MObject Field3DInfo::aOutRotateOrder;
+MObject Field3DInfo::aOutRotateAxis;
+MObject Field3DInfo::aOutRotateAxisX;
+MObject Field3DInfo::aOutRotateAxisY;
+MObject Field3DInfo::aOutRotateAxisZ;
+MObject Field3DInfo::aOutShear;
+MObject Field3DInfo::aOutShearXY;
+MObject Field3DInfo::aOutShearXZ;
+MObject Field3DInfo::aOutShearYZ;
+MObject Field3DInfo::aOutTranslate;
+MObject Field3DInfo::aOutTranslateX;
+MObject Field3DInfo::aOutTranslateY;
+MObject Field3DInfo::aOutTranslateZ;
 
 #define ADD_XYZ_ATTR(attr, longName, shortName)\
   attr = cattr.create(longName, shortName);\
@@ -85,12 +102,12 @@ MObject Field3DVRayMatrix::aOutTranslateZ;
   attributeAffects(attr, aOutShear);\
   attributeAffects(attr, aOutTranslate)
 
-void* Field3DVRayMatrix::creator()
+void* Field3DInfo::creator()
 {
-  return new Field3DVRayMatrix();
+  return new Field3DInfo();
 }
 
-MStatus Field3DVRayMatrix::initialize()
+MStatus Field3DInfo::initialize()
 {
   MFnCompoundAttribute cattr;
   MFnNumericAttribute nattr;
@@ -110,6 +127,108 @@ MStatus Field3DVRayMatrix::initialize()
   uattr.setWritable(true);
   uattr.setReadable(true);
   addAttribute(aTime);
+  
+  aPartition = tattr.create("partition", "prt", MFnData::kString);
+  tattr.setStorable(true);
+  tattr.setReadable(true);
+  tattr.setWritable(true);
+  tattr.setKeyable(false);
+  addAttribute(aPartition);
+  
+  aField = tattr.create("field", "fld", MFnData::kString);
+  tattr.setStorable(true);
+  tattr.setReadable(true);
+  tattr.setWritable(true);
+  tattr.setKeyable(false);
+  addAttribute(aField);
+  
+  aOverrideOffset = nattr.create("overrideOffset", "oof", MFnNumericData::kBoolean, 0);
+  nattr.setStorable(true);
+  nattr.setReadable(true);
+  nattr.setWritable(true);
+  nattr.setKeyable(false);
+  addAttribute(aOverrideDimension);
+  
+  aOffset = nattr.createPoint("offset", "off");
+  nattr.setDefault(0.0, 0.0, 0.0);
+  nattr.setStorable(true);
+  nattr.setReadable(true);
+  nattr.setWritable(true);
+  nattr.setKeyable(true);
+  addAttribute(aOffset);
+  
+  aOverrideDimension = nattr.create("overrideDimension", "odi", MFnNumericData::kBoolean, 0);
+  nattr.setStorable(true);
+  nattr.setReadable(true);
+  nattr.setWritable(true);
+  nattr.setKeyable(false);
+  addAttribute(aOverrideDimension);
+  
+  aDimension = nattr.createPoint("dimension", "dim");
+  nattr.setDefault(1.0, 1.0, 1.0);
+  nattr.setStorable(true);
+  nattr.setReadable(true);
+  nattr.setWritable(true);
+  nattr.setKeyable(true);
+  addAttribute(aDimension);
+  
+  aMode = eattr.create("transformMode", "trm");
+  eattr.setStorable(true);
+  eattr.setReadable(true);
+  eattr.setWritable(true);
+  eattr.setKeyable(false);
+  eattr.addField("full", 0);
+  eattr.addField("without_dimension", 1);
+  eattr.addField("without_offset", 2);
+  eattr.addField("without_dimension_and_offset", 3);
+  addAttribute(aMode);
+  
+  
+  aOutPartitions = tattr.create("outPartitions", "opts", MFnData::kString);
+  tattr.setArray(true);
+  tattr.setStorable(false);
+  tattr.setReadable(true);
+  tattr.setWritable(false);
+  addAttribute(aOutPartitions);
+  
+  aOutFields = tattr.create("outFields", "ofls", MFnData::kString);
+  tattr.setArray(true);
+  tattr.setStorable(false);
+  tattr.setReadable(true);
+  tattr.setWritable(false);
+  addAttribute(aOutFields);
+  
+  aOutResolution = nattr.createPoint("outResolution", "ores");
+  nattr.setStorable(false);
+  nattr.setReadable(true);
+  nattr.setWritable(false);
+  addAttribute(aOutResolution);
+  
+  aOutHasDimension = nattr.create("outHasDimension", "ohd", MFnNumericData::kBoolean, 0);
+  nattr.setStorable(false);
+  nattr.setReadable(true);
+  nattr.setWritable(false);
+  addAttribute(aOutHasDimension);
+  
+  aOutDimension =  nattr.createPoint("outDimension", "odim");
+  nattr.setStorable(false);
+  nattr.setReadable(true);
+  nattr.setWritable(false);
+  addAttribute(aOutDimension);
+  
+  aOutHasOffset = nattr.create("outHasOffset", "oho", MFnNumericData::kBoolean, 0);
+  nattr.setStorable(false);
+  nattr.setReadable(true);
+  nattr.setWritable(false);
+  addAttribute(aOutHasOffset);
+  
+  aOutOffset = nattr.createPoint("outOffset", "ooff");
+  nattr.setStorable(false);
+  nattr.setReadable(true);
+  nattr.setWritable(false);
+  addAttribute(aOutOffset);
+  
+  // aOutMatrix = ;
   
   aOutRotateOrder = eattr.create("outRotateOrder", "oro");
   eattr.addField("xyz", 0);
@@ -156,7 +275,7 @@ MStatus Field3DVRayMatrix::initialize()
   return MStatus::kSuccess;
 }
 
-Field3DVRayMatrix::Field3DVRayMatrix()
+Field3DInfo::Field3DInfo()
    : MPxNode()
    , mBuffer(0)
    , mBufferLength(0)
@@ -164,7 +283,7 @@ Field3DVRayMatrix::Field3DVRayMatrix()
   reset();
 }
 
-Field3DVRayMatrix::~Field3DVRayMatrix()
+Field3DInfo::~Field3DInfo()
 {
   if (mBuffer)
   {
@@ -173,7 +292,7 @@ Field3DVRayMatrix::~Field3DVRayMatrix()
   }
 }
 
-void Field3DVRayMatrix::reset()
+void Field3DInfo::reset()
 {
   mTranslate.x = 0.0;
   mTranslate.y = 0.0;
@@ -194,7 +313,7 @@ void Field3DVRayMatrix::reset()
   mShear[2] = 0.0;
 }
 
-void Field3DVRayMatrix::update(const MString &filename, MTime t, double eps)
+void Field3DInfo::update(const MString &filename, MTime t, double eps)
 {
   if (filename != mLastFilename ||
       fabs(mLastTime.as(MTime::uiUnit()) - t.as(MTime::uiUnit())) > eps)
@@ -307,7 +426,7 @@ void Field3DVRayMatrix::update(const MString &filename, MTime t, double eps)
   }
 }
 
-MStatus Field3DVRayMatrix::compute(const MPlug &plug, MDataBlock &data)
+MStatus Field3DInfo::compute(const MPlug &plug, MDataBlock &data)
 {
   MDataHandle hFilename = data.inputValue(aFilename);
   MDataHandle hTime = data.inputValue(aTime);

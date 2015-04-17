@@ -7,25 +7,29 @@ global proc string createVRayF3dGrid(string $filename)
     }
     
     string $grid = `createNode -ss -name "VRayVolumeGridShape#" VRayVolumeGrid`;
-    string $cst = `createNode -ss Field3DVRayMatrix`;
+    string $f3dinfo = `createNode -ss Field3DInfo`;
     
     setAttr -type "string" ($grid+".inFile") $filename;
     
     string $pl[] = `listRelatives -parent $grid`;
     
-    connectAttr ($grid+".inFile") ($cst+".filename");
-    connectAttr time1.outTime ($cst+".time");
+    connectAttr ($grid+".inFile") ($f3dinfo+".filename");
+    connectAttr time1.outTime ($f3dinfo+".time");
     
-    connectAttr ($cst+".outShear") ($pl[0]+".shear");
-    connectAttr ($cst+".outTranslate") ($pl[0]+".translate");
-    connectAttr ($cst+".outRotate") ($pl[0]+".rotate");
-    connectAttr ($cst+".outScale") ($pl[0]+".scale");
-    connectAttr ($cst+".outRotateOrder") ($pl[0]+".rotateOrder");
-    connectAttr ($cst+".outRotateAxis") ($pl[0]+".rotateAxis");
-    connectAttr ($cst+".outRotatePivot") ($pl[0]+".rotatePivot");
-    connectAttr ($cst+".outRotatePivotTranslate") ($pl[0]+".rotatePivotTranslate");
-    connectAttr ($cst+".outScalePivot") ($pl[0]+".scalePivot");
-    connectAttr ($cst+".outScalePivotTranslate") ($pl[0]+".scalePivotTranslate");
+    string $muldiv = `createNode -ss multiplyDivide`;
+    connectAttr ($f3dinfo+".outResolution") ($muldiv+".input1");
+    setAttr -l 1 ($muldiv+".input2") 0.5 0.5 0.5;
+    
+    connectAttr ($muldiv+".output") ($pl[0]+".translate");
+    setAttr -l 1 ($pl[0]+".rotate") -90.0 0.0 0.0;
+    setAttr -l 1 ($pl[0]+".scale");
+    setAttr -l 1 ($pl[0]+".shear");
+    setAttr -l 1 ($pl[0]+".rotateOrder");
+    setAttr -l 1 ($pl[0]+".rotateAxis");
+    setAttr -l 1 ($pl[0]+".rotatePivot");
+    setAttr -l 1 ($pl[0]+".rotatePivotTranslate");
+    setAttr -l 1 ($pl[0]+".scalePivot");
+    setAttr -l 1 ($pl[0]+".scalePivotTranslate");
     
     select -r $grid;
     
