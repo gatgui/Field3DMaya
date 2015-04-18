@@ -1,5 +1,4 @@
-#include "field3D_VRayMatrix.h"
-#include "field3D_Tools.h"
+#include "field3D_Info.h"
 #include <maya/MFnNumericAttribute.h>
 #include <maya/MFnTypedAttribute.h>
 #include <maya/MFnCompoundAttribute.h>
@@ -90,17 +89,18 @@ MObject Field3DInfo::aOutTranslateZ;
   cattr.addChild(attr ## Z);\
   addAttribute(attr)
 
-#define AFFECTS_OUTPUTS(attr)\
+#define AFFECTS_TRANSFORM_OUTPUTS(attr)\
+  attributeAffects(attr, aOutTranslate);\
+  attributeAffects(attr, aOutRotate);\
+  attributeAffects(attr, aOutRotateOrder);\
+  attributeAffects(attr, aOutRotateAxis);\
+  attributeAffects(attr, aOutRotatePivot);\
+  attributeAffects(attr, aOutRotatePivotTranslate);\
   attributeAffects(attr, aOutScale);\
   attributeAffects(attr, aOutScalePivot);\
   attributeAffects(attr, aOutScalePivotTranslate);\
-  attributeAffects(attr, aOutRotate);\
-  attributeAffects(attr, aOutRotatePivot);\
-  attributeAffects(attr, aOutRotatePivotTranslate);\
-  attributeAffects(attr, aOutRotateOrder);\
-  attributeAffects(attr, aOutRotateAxis);\
   attributeAffects(attr, aOutShear);\
-  attributeAffects(attr, aOutTranslate)
+  attributeAffects(attr, aOutMatrix)
 
 void* Field3DInfo::creator()
 {
@@ -114,6 +114,8 @@ MStatus Field3DInfo::initialize()
   MFnUnitAttribute uattr;
   MFnTypedAttribute tattr;
   MFnEnumAttribute eattr;
+  
+  // input attributes
   
   aFilename = tattr.create("filename", "fn", MFnData::kString);
   tattr.setStorable(true);
@@ -183,6 +185,7 @@ MStatus Field3DInfo::initialize()
   eattr.addField("without_dimension_and_offset", 3);
   addAttribute(aMode);
   
+  // output attributes
   
   aOutPartitions = tattr.create("outPartitions", "opts", MFnData::kString);
   tattr.setArray(true);
@@ -228,7 +231,11 @@ MStatus Field3DInfo::initialize()
   nattr.setWritable(false);
   addAttribute(aOutOffset);
   
-  // aOutMatrix = ;
+  aOutMatrix = tattr.create("outMatrix", "omtx", MFnData::kMatrix);
+  tattr.setStorable(false);
+  tattr.setReadable(true);
+  tattr.setWritable(false);
+  addAttribute(aOutMatrix);
   
   aOutRotateOrder = eattr.create("outRotateOrder", "oro");
   eattr.addField("xyz", 0);
@@ -269,8 +276,48 @@ MStatus Field3DInfo::initialize()
   ADD_XYZ_ATTR(aOutRotateAxis, "outRotateAxis", "ora");
   ADD_XYZ_ATTR(aOutTranslate, "outTranslate", "ot");
   
-  AFFECTS_OUTPUTS(aFilename);
-  AFFECTS_OUTPUTS(aTime);
+  // ---
+  
+  attributeAffects(aFilename, aOutPartitions);
+  attributeAffects(aTime, aOutPartitions);
+  
+  attributeAffects(aFilename, aOutFields);
+  attributeAffects(aTime, aOutFields);
+  attributeAffects(aPartition, aOutFields);
+  
+  attributeAffects(aFilename, aOutHasDimension);
+  attributeAffects(aTime, aOutHasDimension);
+  attributeAffects(aPartition, aOutHasDimension);
+  attributeAffects(aField, aOutHasDimension);
+  
+  attributeAffects(aFilename, aOutDimension);
+  attributeAffects(aTime, aOutDimension);
+  attributeAffects(aPartition, aOutDimension);
+  attributeAffects(aField, aOutDimension);
+  attributeAffects(aOverrideDimension, aOutDimension);
+  attributeAffects(aDimension, aOutDimension);
+  
+  attributeAffects(aFilename, aOutHasOffset);
+  attributeAffects(aTime, aOutHasOffset);
+  attributeAffects(aPartition, aOutHasOffset);
+  attributeAffects(aField, aOutHasOffset);
+  
+  attributeAffects(aFilename, aOutOffset);
+  attributeAffects(aTime, aOutOffset);
+  attributeAffects(aPartition, aOutOffset);
+  attributeAffects(aField, aOutOffset);
+  attributeAffects(aOverrideOffset, aOutOffset);
+  attributeAffects(aOffset, aOutOffset);
+  
+  AFFECTS_TRANSFORM_OUTPUTS(aFilename);
+  AFFECTS_TRANSFORM_OUTPUTS(aTime);
+  AFFECTS_TRANSFORM_OUTPUTS(aPartition);
+  AFFECTS_TRANSFORM_OUTPUTS(aField);
+  AFFECTS_TRANSFORM_OUTPUTS(aOverrideOffset);
+  AFFECTS_TRANSFORM_OUTPUTS(aOffset);
+  AFFECTS_TRANSFORM_OUTPUTS(aOverrideDimension);
+  AFFECTS_TRANSFORM_OUTPUTS(aDimension);
+  AFFECTS_TRANSFORM_OUTPUTS(aTransformMode);
   
   return MStatus::kSuccess;
 }
@@ -279,6 +326,12 @@ Field3DInfo::Field3DInfo()
    : MPxNode()
    , mBuffer(0)
    , mBufferLength(0)
+   , mLastTransformMode(Field3DInfo::TransformMode::TM_full)
+   , mLastOverrideOffset(false)
+   , mLastOffset(0.0, 0.0, 0.0)
+   , mLastOverrideDimension(false)
+   , mLastDimension(1.0, 1.0, 1.0)
+   , mFile(0)
 {
   reset();
 }
@@ -289,6 +342,12 @@ Field3DInfo::~Field3DInfo()
   {
     delete[] mBuffer;
     mBuffer = 0;
+  }
+  
+  if (mFile)
+  {
+    delete mFile;
+    mFile = 0;
   }
 }
 
@@ -311,13 +370,42 @@ void Field3DInfo::reset()
   mShear[0] = 0.0;
   mShear[1] = 0.0;
   mShear[2] = 0.0;
+  
+  mMatrix.setToIdentity();
+  
+  mHasOffset = false;
+  mOffset[0] = 0.0;
+  mOffset[1] = 0.0;
+  mOffset[2] = 0.0;
+  
+  mHasDimension = false;
+  mDimension[0] = 1.0;
+  mDimension[1] = 1.0;
+  mDimension[2] = 1.0;
+  
+  mResolution[0] = 0.0;
+  mResolution[1] = 0.0;
+  mResolution[2] = 0.0;
 }
 
-void Field3DInfo::update(const MString &filename, MTime t, double eps)
+void Field3DInfo::update(const MString &filename, MTime t,
+                         const MString &partition, const MString &field,
+                         bool overrideOffset, const MPoint &offset,
+                         bool overrideDimension, const MPoint &dimension,
+                         TransformMode transformMode,
+                         double eps)
 {
   if (filename != mLastFilename ||
-      fabs(mLastTime.as(MTime::uiUnit()) - t.as(MTime::uiUnit())) > eps)
+      fabs(mLastTime.as(MTime::uiUnit()) - t.as(MTime::uiUnit())) > eps))
   {
+    // file changed
+    
+    if (mFile)
+    {
+      delete mFile;
+      mFile = 0;
+    }
+    
     int fullframe = int(floor(t.as(MTime::uiUnit()) + 0.5));
     
     if (filename != mLastFilename)
@@ -394,27 +482,8 @@ void Field3DInfo::update(const MString &filename, MTime t, double eps)
       }
       else
       {
-        MTransformationMatrix zupM, resM, finalM;
-        
-        // Yup -> Zup convert matrix
-        double rX[3] = {MAngle(-90.0, MAngle::kDegrees).asRadians(), 0.0, 0.0};
-        zupM.setRotation(rX, MTransformationMatrix::kXYZ);  
-        
-        // Resolution offset matrix
-        unsigned int res[3] = {0, 0, 0};
-        Field3DTools::getFieldsResolution(f3dIn, res);
-        MVector tR(0.5 * res[0], 0.5 * res[1], 0.5 * res[2]);
-        resM.setTranslation(tR, MSpace::kTransform);
-        
-        finalM = (resM.asMatrix() * zupM.asMatrix()).inverse();
-        
-        mTranslate = finalM.getTranslation(MSpace::kTransform);
-        finalM.getRotation(mRotate, mRotateOrder);
-        finalM.getScale(mScale, MSpace::kTransform);
-        finalM.getShear(mShear, MSpace::kTransform);
+        mFile = f3dIn;
       }
-      
-      delete f3dIn;
     }
     else
     {
@@ -423,6 +492,187 @@ void Field3DInfo::update(const MString &filename, MTime t, double eps)
     
     mLastFilename = filename;
     mLastTime = t;
+    
+    // force partition refresh (only?)
+    mLastPartition = partition + "@";
+  }
+  
+  if (mFile)
+  {
+    if (partition != mLastPartition)
+    {
+      mPartitions.clear();
+      
+      if (partition.length() == 0)
+      {
+        mFile->getPartitionNames(mPartitions);
+      }
+      else
+      {
+        mPartitions.push_back(partition.asChar());
+      }
+      
+      mLastPartition = partition;
+      
+      // force fields update (only?)
+      mLastField = field + "@";
+    }
+    
+    if (field != mLastField)
+    {
+      mFields.clear();
+      
+      if (field.length() == 0)
+      {
+        if (!mPartitions.empty())
+        {
+          Field3DTools::getFieldNames(mFile, mPartitions[0], mFields);
+        }
+      }
+      else
+      {
+        mFields.push_back(field.asChar());
+      }
+      
+      mLastField = field;
+      
+      // force any other update?
+    }
+    
+    // Get field pointer
+    Field3D::EmptyField<float>::Ptr field;
+    
+    if (!mPartitions.empty() && !mFields.empty())
+    {
+      Field3D::EmptyField<float>::Vec sl = mFile->readProxyLayer<float>(mPartitions[0], mFields[0], false);
+      
+      if (sl.empty())
+      {
+        sl = mFile->readProxyLayer<float>(mPartitions[0], mFields[0], true);
+        
+        if (!sl.empty())
+        {
+          field = sl[0]
+        }
+      }
+    }
+    
+    // find field
+    /*
+    MTransformationMatrix zupM, resM, finalM;
+    
+    // Yup -> Zup convert matrix
+    double rX[3] = {MAngle(-90.0, MAngle::kDegrees).asRadians(), 0.0, 0.0};
+    zupM.setRotation(rX, MTransformationMatrix::kXYZ);  
+    
+    // Resolution offset matrix
+    unsigned int res[3] = {0, 0, 0};
+    Field3DTools::getFieldsResolution(f3dIn, res);
+    MVector tR(0.5 * res[0], 0.5 * res[1], 0.5 * res[2]);
+    resM.setTranslation(tR, MSpace::kTransform);
+    
+    finalM = (resM.asMatrix() * zupM.asMatrix()).inverse();
+    
+    mTranslate = finalM.getTranslation(MSpace::kTransform);
+    finalM.getRotation(mRotate, mRotateOrder);
+    finalM.getScale(mScale, MSpace::kTransform);
+    finalM.getShear(mShear, MSpace::kTransform);
+    
+    bool getFieldsResolution(Field3D::Field3DInputFile *inFile, unsigned int (&res)[3]);
+    bool getFieldsResolution(Field3D::Field3DInputFile *inFile, const std::string &partition, const std::string &name, unsigned int (&res)[3]);
+    */
+    
+    
+    
+    if (overrideOffset != mLastOverrideOffset)
+    {
+      if (overrideOffset)
+      {
+        // anything else?
+        mHasOffset = true;
+      }
+      
+      mLastOverrideOffset = overrideOffset;
+    }
+    
+    if (overrideOffset && !offset.isEquivalent(mLastOffset))
+    {
+      mOffset = offset;
+      mLastOffset = offset;
+    }
+    
+    if (overrideDimension != mLastOverrideDimension)
+    {
+      if (overrideDimension)
+      {
+        // anything else?
+        mHasDimension = true;
+      }
+      
+      mLastOverrideDimension = overrideDimension;
+    }
+    
+    if (overrideDimension && !dimension.isEquivalent(mLastDimension))
+    {
+      mDimension = dimension;
+      mLastDimension = dimension;
+    }
+    
+    if (field)
+    {
+      Field3D::V3f dv(std::numeric_limits<float>::max(),
+                      std::numeric_limits<float>::max(),
+                      std::numeric_limits<float>::max());
+      
+      if (!overrideOffset)
+      {
+        Field3D::V3f o = field->metadata().vecFloatMetadata("Offset", dv);
+        mHasOffset = (o != dv);
+        mOffset = MPoint(o.x, o.y, p.z);
+      }
+
+      if (!overrideDimension)
+      {
+        // read from field
+        Field3D::V3f d = field->metadata().vecFloatMetadata("Dimension", dv);
+        mHasOffset = (d != dv);
+        mDimension = MPoint(d.x, d.y, d.z);
+      }
+      
+      Field3D::MatrixFieldMapping::Ptr mapping = field_dynamic_cast<Field3D::MatrixFieldMapping>(field->mapping()();
+      
+      static double sMapTo01[4][4] = {{  1.0 ,  0.0 ,  0.0 , 0.0 } ,
+                                      {  0.0 ,  1.0 ,  0.0 , 0.0 } ,
+                                      {  0.0 ,  0.0 ,  1.0 , 0.0 } ,
+                                      { -0.5 , -0.5 , -0.5 , 1.0 }};
+      // M = mapTo01 * Sdim * Toff * Xform
+      
+      MMatrix mapTo01(sMapTo01);
+      
+      if (mapping)
+      {
+        MMatrix localToWorld(mapping->localToWorld().x);
+      }
+      else
+      {
+        // M = ID
+        switch (transformMode)
+        {
+        }
+      }
+    }
+    else
+    {
+      reset();
+    }
+    
+    
+    
+  }
+  else
+  {
+    //reset();
+    // or just clean fields?
   }
 }
 
@@ -430,16 +680,75 @@ MStatus Field3DInfo::compute(const MPlug &plug, MDataBlock &data)
 {
   MDataHandle hFilename = data.inputValue(aFilename);
   MDataHandle hTime = data.inputValue(aTime);
+  MDataHandle hPartition = data.inputValue(aPartition);
+  MDataHandle hField = data.inputValue(aField);
+  MDataHandle hOverrideOffset = data.inputValue(aOverrideOffset);
+  MDataHandle hOffset = data.inputValue(aOffset);
+  MDataHandle hOverrideDimension = data.inputValue(aOverrideDimension);
+  MDataHandle hDimension = data.inputValue(aDimension);
+  MDataHandle hTransformMode = data.inputValue(aTransformMode);
   
   const MString &filename = hFilename.asString();
   MTime t = hTime.asTime();
+  const MString &partition = hPartition.asString();
+  const MString &field = hField.asString();
+  bool overrideOffset = hOverrideOffset.asBool();
+  MPoint offset = hOffset.asVector();
+  bool overrideDimension = hOverrideDimension.asBool();
+  MPoint dimension = hDimension.asVector();
+  TransformMode transformMode = (TransformMode) hTransformMode.asShort();
   
-  update(filename, t);
+  update(filename, t, partition, field, overrideOffset, offset,
+         overrideDimension, dimension, transformMode);
   
   MObject oAttr = plug.attribute();
   
+  if (oAttr == aOutPartitions)
+  {
+    MArrayDataHandle hOut = data.outputArrayValue(aOutPartitions);
+    // use an array builder
+    // plug.logicalIndex()
+    MGlobal::displayInfo("TODO: Update outPartitions...");
+  }
+  else if (oAttr == aOutFields)
+  {
+    MArrayDataHandle hOut = data.outputArrayValue(aOutFields);
+    // use an array builder
+    // plug.logicalIndex()?
+    MGlobal::displayInfo("TODO: Update outFields...");
+  }
+  else if (oAttr == aOutResolution)
+  {
+    MDataHandle hOut = data.outputValue(aOutResolution);
+    hOut.set(mResolution);
+  }
+  else if (oAttr == aOutHasOffset)
+  {
+    MDataHandle hOut = data.outputValue(aOutHasOffset);
+    hOut.set(mHasOffset);
+  }
+  else if (oAttr == aOutOffset)
+  {
+    MDataHandle hOut = data.outputValue(aOutOffset);
+    hOut.set(mOffset);
+  }
+  else if (oAttr == aOutHasDimension)
+  {
+    MDataHandle hOut = data.outputValue(aOutHasDimension);
+    hOut.set(mHasDimension);
+  }
+  else if (oAttr == aOutDimension)
+  {
+    MDataHandle hOut = data.outputValue(aOutDimension);
+    hOut.set(mDimension);
+  }
+  else if (oAttr == aOutMatrix)
+  {
+    MDataHandle hOut = data.outputValue(aOutMatrix);
+    hOut.set(mMatrix);
+  }
   // Translation
-  if (oAttr == aOutTranslate)
+  else if (oAttr == aOutTranslate)
   {
     MDataHandle hOut = data.outputValue(oAttr);
     hOut.set(mTranslate.x, mTranslate.y, mTranslate.z);

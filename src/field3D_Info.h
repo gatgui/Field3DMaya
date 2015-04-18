@@ -1,13 +1,18 @@
-#ifndef FIELD3D_MAYA_VRAYMATRIX
-#define FIELD3D_MAYA_VRAYMATRIX
+#ifndef FIELD3D_MAYA_INFO
+#define FIELD3D_MAYA_INFO
 
 #include <maya/MPxNode.h>
 #include <maya/MTransformationMatrix.h>
 #include <maya/MTime.h>
 #include <maya/MVector.h>
+#include <maya/MPoint.h>
+#include <maya/MMatrix.h>
 #include <maya/MString.h>
+#include <vector>
+#include <string>
+#include "field3D_Tools.h"
 
-class Field3DVRayMatrix : public MPxNode
+class Field3DInfo : public MPxNode
 {
 public:
    
@@ -72,8 +77,8 @@ public:
 
 public:
    
-   Field3DVRayMatrix();
-   virtual ~Field3DVRayMatrix();
+   Field3DInfo();
+   virtual ~Field3DInfo();
    
    virtual MStatus compute(const MPlug &plug, MDataBlock &data);
    
@@ -82,20 +87,50 @@ public:
    
 private:
    
+   enum TransformMode
+   {
+      TM_full = 0,
+      TM_no_dim,
+      TM_no_off,
+      TM_no_dim_and_off
+   };
+   
    void reset();
-   void update(const MString &filename, MTime t, double eps=0.0001);
+   void update(const MString &filename, MTime t,
+               const MString &partition, const MString &field,
+               bool overrideOffset, const MPoint &offset,
+               bool overrideDimension, const MPoint &dimension,
+               TransformMode transformMode,
+               double eps=0.0001);
    
    char *mBuffer;
    size_t mBufferLength;
    MString mLastFilename;
    std::string mFramePattern;
    MTime mLastTime;
+   MString mLastPartition;
+   MString mLastField;
+   TransformMode mLastTransformMode;
+   bool mLastOverrideOffset;
+   MPoint mLastOffset;
+   bool mLastOverrideDimension;
+   MPoint mLastDimension;
+   Field3D::Field3DInputFile *mFile;
    
+   std::vector<std::string> mPartitions;
+   std::vector<std::string> mFields;
+   MPoint mResolution;
+   bool mHasOffset;
+   MPoint mOffset;
+   bool mHasDimension;
+   MPoint mDimension;
+   TransformMode mTransformMode;
    MVector mTranslate;
    double mRotate[3];
    MTransformationMatrix::RotationOrder mRotateOrder;
    double mScale[3];
    double mShear[3];
+   MMatrix mMatrix;
 };
 
 #endif
