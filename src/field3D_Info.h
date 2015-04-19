@@ -96,6 +96,10 @@ private:
    };
    
    void reset();
+   void resetOffset();
+   void resetDimension();
+   void resetResolution();
+   void resetTransform();
    void update(const MString &filename, MTime t,
                const MString &partition, const MString &field,
                bool overrideOffset, const MPoint &offset,
@@ -111,10 +115,6 @@ private:
    MString mLastPartition;
    MString mLastField;
    TransformMode mLastTransformMode;
-   bool mLastOverrideOffset;
-   MPoint mLastOffset;
-   bool mLastOverrideDimension;
-   MPoint mLastDimension;
    Field3D::Field3DInputFile *mFile;
    
    std::vector<std::string> mPartitions;
