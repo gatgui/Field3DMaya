@@ -100,6 +100,7 @@ private:
    void resetDimension();
    void resetResolution();
    void resetTransform();
+   void resetFile();
    void update(const MString &filename, MTime t,
                const MString &partition, const MString &field,
                bool overrideOffset, const MPoint &offset,
@@ -124,7 +125,6 @@ private:
    MPoint mOffset;
    bool mHasDimension;
    MPoint mDimension;
-   TransformMode mTransformMode;
    MVector mTranslate;
    double mRotate[3];
    MTransformationMatrix::RotationOrder mRotateOrder;

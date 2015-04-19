@@ -175,7 +175,7 @@ MStatus Field3DInfo::initialize()
   nattr.setKeyable(true);
   addAttribute(aDimension);
   
-  aMode = eattr.create("transformMode", "trm");
+  aTransformMode = eattr.create("transformMode", "trm");
   eattr.setStorable(true);
   eattr.setReadable(true);
   eattr.setWritable(true);
@@ -184,7 +184,7 @@ MStatus Field3DInfo::initialize()
   eattr.addField("without_dimension", 1);
   eattr.addField("without_offset", 2);
   eattr.addField("without_dimension_and_offset", 3);
-  addAttribute(aMode);
+  addAttribute(aTransformMode);
   
   // output attributes
   
@@ -327,7 +327,7 @@ Field3DInfo::Field3DInfo()
    : MPxNode()
    , mBuffer(0)
    , mBufferLength(0)
-   , mLastTransformMode(Field3DInfo::TransformMode::TM_full)
+   , mLastTransformMode(Field3DInfo::TM_full)
    , mFile(0)
 {
   reset();
@@ -419,7 +419,7 @@ void Field3DInfo::update(const MString &filename, MTime t,
   bool forceUpdate = false;
   
   if (filename != mLastFilename ||
-      fabs(mLastTime.as(MTime::uiUnit()) - t.as(MTime::uiUnit())) > eps))
+      fabs(mLastTime.as(MTime::uiUnit()) - t.as(MTime::uiUnit())) > eps)
   {
     // file changed
     
@@ -556,18 +556,6 @@ void Field3DInfo::update(const MString &filename, MTime t,
     mHasDimension = false;
     mDimension = MPoint(1.0, 1.0, 1.0);
     
-    if (overrideOffset)
-    {
-      mHasOffset = true;
-      mOffset = offset;
-    }
-    
-    if (overrideDimension)
-    {
-      mHasDimension = true;
-      mDimension = dimension;
-    }
-    
     // Get pointer to target field
     Field3D::EmptyField<float>::Ptr field;
     
@@ -613,7 +601,7 @@ void Field3DInfo::update(const MString &filename, MTime t,
       {
         Field3D::V3f o = field->metadata().vecFloatMetadata("Offset", dv);
         mHasOffset = (o != dv);
-        mOffset = MPoint(o.x, o.y, p.z);
+        mOffset = MPoint(o.x, o.y, o.z);
       }
       
       if (!overrideDimension)
@@ -624,7 +612,7 @@ void Field3DInfo::update(const MString &filename, MTime t,
         mDimension = MPoint(d.x, d.y, d.z);
       }
       
-      Field3D::MatrixFieldMapping::Ptr mapping = field_dynamic_cast<Field3D::MatrixFieldMapping>(field->mapping()();
+      Field3D::MatrixFieldMapping::Ptr mapping = field_dynamic_cast<Field3D::MatrixFieldMapping>(field->mapping());
       
       MMatrix M;
       MMatrix mapTo01(sMapTo01);
@@ -651,12 +639,27 @@ void Field3DInfo::update(const MString &filename, MTime t,
         M.setToIdentity();
       }
       
-      xform = mapTo01.inverse() * Mdim.inverse() * Moff.inverse() * M;
+      xform = M;
+      // xform = mapTo01.inverse() * Mdim.inverse() * Moff.inverse() * M;
       
       mTranslate = xform.getTranslation(MSpace::kTransform);
       xform.getRotation(mRotate, mRotateOrder);
       xform.getScale(mScale, MSpace::kTransform);
       xform.getShear(mShear, MSpace::kTransform);
+      
+      if (overrideOffset)
+      {
+        mHasOffset = true;
+        mOffset = offset;
+      }
+      
+      if (overrideDimension)
+      {
+        mHasDimension = true;
+        mDimension = dimension;
+      }
+      
+      // adjust matrix?
     }
     else
     {

@@ -61,15 +61,15 @@ MStatus initializePlugin( MObject obj )
     return status;
   }
   
-  status = plugin.registerNode( "Field3DVRayMatrix",
-                                Field3DVRayMatrix::id,
-                                &Field3DVRayMatrix::creator,
-                                &Field3DVRayMatrix::initialize,
+  status = plugin.registerNode( "Field3DInfo",
+                                Field3DInfo::id,
+                                &Field3DInfo::creator,
+                                &Field3DInfo::initialize,
                                 MPxNode::kDependNode );
     
   if (!status)
   {
-    status.perror( "registerNode FieldVRayMatrix failed" );
+    status.perror( "registerNode Field3DInfo failed" );
     return status;
   }
   
@@ -119,7 +119,7 @@ MStatus uninitializePlugin( MObject obj )
     return status;
   }
   
-  status = plugin.deregisterNode( Field3DVRayMatrix::id );
+  status = plugin.deregisterNode( Field3DInfo::id );
   
   if (!status)
   {

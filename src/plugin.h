@@ -40,7 +40,7 @@
 #include "field3D_Import.h"
 #include "field3D_ForceLoad.h"
 #include "field3D_Query.h"
-#include "field3D_VRayMatrix.h"
+#include "field3D_Info.h"
 
 extern MStatus initializePlugin( MObject obj )   ;
 extern MStatus uninitializePlugin( MObject obj ) ;
