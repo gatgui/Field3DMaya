@@ -321,8 +321,6 @@ MStatus importF3d::doIt(const MArgList &argList)
         }
       }
       
-      MGlobal::displayInfo(MString("importF3d: Create XML \"") + xmlFile.c_str() + "\"");
-      
       MString shapeName = (ns + partition).c_str();
       
       if (!xmlOnly)
@@ -467,6 +465,8 @@ MStatus importF3d::doIt(const MArgList &argList)
         
       if (!dontWrite)
       {
+        MGlobal::displayInfo(MString("importF3d: Create XML \"") + xmlFile.c_str() + "\"");
+        
         bool sparse = false;
         MString format = "half";
         

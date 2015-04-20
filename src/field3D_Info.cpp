@@ -513,7 +513,7 @@ void Field3DInfo::update(const MString &filename, MTime t,
         mFramePattern = filename.asChar();
       }
       
-      MGlobal::displayInfo(MString("Use frame pattern: ") + mFramePattern.c_str());
+      // MGlobal::displayInfo(MString("Use frame pattern: ") + mFramePattern.c_str());
     }
     
     if (mBuffer)
