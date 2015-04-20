@@ -81,7 +81,7 @@ MSyntax importF3d::newSyntax()
   syntax.addFlag("-rc", "-remapChannels", MSyntax::kString);
   syntax.addFlag("-v", "-verbose", MSyntax::kNoArg);
   syntax.addFlag("-rs", "-recacheSparse", MSyntax::kBoolean);
-  syntax.addFlag("-rh", "-recacheHalf", MSyntax::kBoolean);
+  syntax.addFlag("-rf", "-recacheFormat", MSyntax::kString);
   
   syntax.setMinObjects(0);
   syntax.setMaxObjects(0);
@@ -295,6 +295,8 @@ MStatus importF3d::doIt(const MArgList &argList)
     
     for (size_t i=0; i<partitions.size(); ++i)
     {
+      bool dontWrite = false;
+      
       std::string &partition = partitions[i];
       
       MSelectionList sl;
@@ -303,11 +305,20 @@ MStatus importF3d::doIt(const MArgList &argList)
       
       std::string xmlFile = xmlDir + "/" + xmlBase + partition + xmlExt;
       
-      FILE *f = fopen(xmlFile.c_str(), "w");
-      if (!f)
+      FILE *f = fopen(xmlFile.c_str(), "r");
+      if (f)
       {
-        MGlobal::displayWarning(MString("importF3d: Cannot open file ") + xmlFile.c_str() + " for writing");
-        continue;
+        fclose(f);
+        dontWrite = true;
+      }
+      else
+      {
+        f = fopen(xmlFile.c_str(), "w");
+        if (!f)
+        {
+          MGlobal::displayWarning(MString("importF3d: Cannot open file ") + xmlFile.c_str() + " for writing");
+          continue;
+        }
       }
       
       MGlobal::displayInfo(MString("importF3d: Create XML \"") + xmlFile.c_str() + "\"");
@@ -373,32 +384,8 @@ MStatus importF3d::doIt(const MArgList &argList)
         }
       }
       
-      // -> generate an XML (use xmlFile if provided or use a tmp file just the time to call
-      //                     the nCache import command)
-      // 
-      // don't forget the remapChannels
-      
       // -remapChannels "coord=texture,v_mac=velocity"
-      
-      // Figure out channels !
-      unsigned int resolution[3] = {0, 0, 0};
-      double dimension[3] = {1.0, 1.0, 1.0};
-      Field3D::V3f offset(0.0, 0.0, 0.0);
-      bool sparse = false;
-      bool half = true;
-      
-      offset = f3d.metadata().vecFloatMetadata("Offset", offset);
-      
-      if (args.isFlagSet("-recacheSparse"))
-      {
-        args.getFlagArgument("-recacheSparse", 0, sparse);
-      }
-      
-      if (args.isFlagSet("-recacheHalf"))
-      {
-        args.getFlagArgument("-recacheHalf", 0, half);
-      }
-      
+        
       std::vector<std::string> layerNames;
       std::map<std::string, FieldInfo> channels;
       std::map<std::string, FieldInfo>::iterator channelIt;
@@ -432,21 +419,6 @@ MStatus importF3d::doIt(const MArgList &argList)
           info.field = fields[0];
           
           channels[channel] = info;
-          
-          Field3D::V3i res = info.field->dataResolution();
-              
-          if ((unsigned int) res.x > resolution[0])
-          {
-            resolution[0] = (unsigned int) res.x;
-          }
-          if ((unsigned int) res.y > resolution[1])
-          {
-            resolution[1] = (unsigned int) res.y;
-          }
-          if ((unsigned int) res.z > resolution[2])
-          {
-            resolution[2] = (unsigned int) res.z;
-          }
         }
         else if (channelIt->second.name != info.name)
         {
@@ -476,7 +448,6 @@ MStatus importF3d::doIt(const MArgList &argList)
         if (channelIt == channels.end())
         {
           // type doesn't matter for EmptyField, use any
-          
           Field3D::EmptyField<Field3D::V3h>::Vec fields = f3d.readProxyLayer<Field3D::V3h>(partition, info.name, true);
           if (fields.empty())
           {
@@ -486,71 +457,6 @@ MStatus importF3d::doIt(const MArgList &argList)
           info.field = fields[0];
           
           channels[channel] = info;
-          
-          Field3D::V3i res = info.field->dataResolution();
-                
-          if ((unsigned int) res.x > resolution[0])
-          {
-            resolution[0] = (unsigned int) res.x;
-          }
-          if ((unsigned int) res.y > resolution[1])
-          {
-            resolution[1] = (unsigned int) res.y;
-          }
-          if ((unsigned int) res.z > resolution[2])
-          {
-            resolution[2] = (unsigned int) res.z;
-          }
-          
-          if (verbose)
-          {
-            char tmp[256];
-            sprintf(tmp, "%u x %u x %u", resolution[0], resolution[1], resolution[2]);
-            
-            MGlobal::displayInfo(MString("importF3d: Resolution = ") + tmp);
-          }
-          
-          Field3D::MatrixFieldMapping::Ptr mapping = boost::dynamic_pointer_cast<Field3D::MatrixFieldMapping>(info.field->mapping());
-          
-          if (mapping)
-          {
-            static double _mapTo01[4][4] = {{  1.0 ,  0.0 ,  0.0 , 0.0 },
-                                            {  0.0 ,  1.0 ,  0.0 , 0.0 },
-                                            {  0.0 ,  0.0 ,  1.0 , 0.0 },
-                                            { -0.5 , -0.5 , -0.5 , 1.0 }};
-            
-            MTransformationMatrix pM = fluidTr.transformation();
-            
-            MMatrix localToWorld(mapping->localToWorld().x);
-            
-            // localToWorld = mapTo01 * scale(dimensions) * translate(offset) * pM
-            
-            localToWorld *= pM.asMatrix().inverse();
-            
-            // localToWorld = mapTo01 * scale(dimensions) * translate(offset)
-            
-            localToWorld = MMatrix(_mapTo01).inverse() * localToWorld;
-            
-            // localToWorld = scale(dimensions) * translate(offset)
-            
-            dimension[0] = localToWorld(0, 0);
-            dimension[1] = localToWorld(1, 1);
-            dimension[2] = localToWorld(2, 2);
-            //offset[0] = localToWorld(3. 0);
-            //offset[1] = localToWorld(3. 1);
-            //offset[2] = localToWorld(3. 2);
-            
-            if (verbose)
-            {
-              char tmp[256];
-              sprintf(tmp, "%f x %f x %f", dimension[0], dimension[1], dimension[2]);
-              
-              MGlobal::displayInfo(MString("importF3d: Dimensions = ") + tmp);
-            }
-            
-          }
-          
-          // get the matrix and apply a constant offset too
         }
         else if (channelIt->second.name != info.name)
         {
@@ -558,90 +464,134 @@ MStatus importF3d::doIt(const MArgList &argList)
           continue;
         }
       }
-      
-      MTime t(1, MTime::uiUnit());
-      
-      int timePerFrame = int(floor(t.asUnits(MTime::k6000FPS)));
-      
-      t.setValue(startFrame);  
-      int startTime = int(floor(t.asUnits(MTime::k6000FPS)));
-      
-      t.setValue(endFrame);
-      int endTime = int(floor(t.asUnits(MTime::k6000FPS)));
-      
-      fprintf(f, "<?xml version=\"1.0\"?>\n");
-      fprintf(f, "<Autodesk_Cache_File>\n");
-      fprintf(f, "  <cacheType Type=\"OneFilePerFrame\" Format=\"f3d_%s_%s\"/>\n", (sparse ? "sparse" : "dense"), (half ? "half" : "float"));
-      fprintf(f, "  <time Range=\"%d-%d\"/>\n", startTime, endTime);
-      fprintf(f, "  <cacheTimePerFrame TimePerFrame=\"%d\"/>\n", timePerFrame);
-      fprintf(f, "  <cacheVersion Version=\"2.0\"/>\n");
-      if (SamePath(xmlDir, cacheDir))
+        
+      if (!dontWrite)
       {
-        size_t p = pat.find_last_of("\\/");
-        if (p != std::string::npos)
+        bool sparse = false;
+        MString format = "half";
+        
+        if (args.isFlagSet("-recacheSparse"))
         {
-          fprintf(f, "  <extra>f3d.file=%s</extra>\n", pat.substr(p+1).c_str());
+          args.getFlagArgument("-recacheSparse", 0, sparse);
+        }
+        
+        if (args.isFlagSet("-recacheFormat"))
+        {
+          args.getFlagArgument("-recacheFormat", 0, format);
+        }
+        
+        MTime t(1, MTime::uiUnit());
+        
+        int timePerFrame = int(floor(t.asUnits(MTime::k6000FPS)));
+        
+        t.setValue(startFrame);  
+        int startTime = int(floor(t.asUnits(MTime::k6000FPS)));
+        
+        t.setValue(endFrame);
+        int endTime = int(floor(t.asUnits(MTime::k6000FPS)));
+        
+        fprintf(f, "<?xml version=\"1.0\"?>\n");
+        fprintf(f, "<Autodesk_Cache_File>\n");
+        fprintf(f, "  <cacheType Type=\"OneFilePerFrame\" Format=\"f3d_%s_%s\"/>\n", (sparse ? "sparse" : "dense"), format.asChar());
+        fprintf(f, "  <time Range=\"%d-%d\"/>\n", startTime, endTime);
+        fprintf(f, "  <cacheTimePerFrame TimePerFrame=\"%d\"/>\n", timePerFrame);
+        fprintf(f, "  <cacheVersion Version=\"2.0\"/>\n");
+        if (SamePath(xmlDir, cacheDir))
+        {
+          size_t p = pat.find_last_of("\\/");
+          if (p != std::string::npos)
+          {
+            fprintf(f, "  <extra>f3d.file=%s</extra>\n", pat.substr(p+1).c_str());
+          }
+          else
+          {
+            fprintf(f, "  <extra>f3d.file=%s</extra>\n", pat.c_str());
+          }
         }
         else
         {
           fprintf(f, "  <extra>f3d.file=%s</extra>\n", pat.c_str());
         }
-      }
-      else
-      {
-        fprintf(f, "  <extra>f3d.file=%s</extra>\n", pat.c_str());
-      }
-      for (std::map<std::string, std::string>::iterator mit = m_remapChannels.begin(); mit != m_remapChannels.end(); ++mit)
-      {
-        fprintf(f, "  <extra>f3d.remap=%s:%s</extra>\n", mit->second.c_str(), mit->first.c_str());
-      }
-      fprintf(f, "  <Channels>\n");
-      
-      int d = 0;
-      
-      for (std::set<std::string>::iterator nit = scalarChannelNames.begin(); nit != scalarChannelNames.end(); ++nit)
-      {
-        channelIt = channels.find(*nit);
-        if (channelIt != channels.end())
+        for (std::map<std::string, std::string>::iterator mit = m_remapChannels.begin(); mit != m_remapChannels.end(); ++mit)
         {
-          fprintf(f, "    <channel%d ChannelName=\"%s_%s\" ChannelType=\"FloatArray\" ChannelInterpretation=\"%s\" SamplingType=\"Regular\" SamplingRate=\"%d\" StartTime=\"%d\" EndTime=\"%d\"/>\n",
-                  d++, shapeName.asChar(), nit->c_str(), nit->c_str(), timePerFrame, startTime, endTime);
+          fprintf(f, "  <extra>f3d.remap=%s:%s</extra>\n", mit->second.c_str(), mit->first.c_str());
         }
-      }
-      
-      for (std::set<std::string>::iterator nit = vectorChannelNames.begin(); nit != vectorChannelNames.end(); ++nit)
-      {
-        channelIt = channels.find(*nit);
-        if (channelIt != channels.end())
+        fprintf(f, "  <Channels>\n");
+        
+        int d = 0;
+        
+        for (std::set<std::string>::iterator nit = scalarChannelNames.begin(); nit != scalarChannelNames.end(); ++nit)
         {
-          fprintf(f, "    <channel%d ChannelName=\"%s_%s\" ChannelType=\"FloatArray\" ChannelInterpretation=\"%s\" SamplingType=\"Regular\" SamplingRate=\"%d\" StartTime=\"%d\" EndTime=\"%d\"/>\n",
-                  d++, shapeName.asChar(), nit->c_str(), nit->c_str(), timePerFrame, startTime, endTime);
+          channelIt = channels.find(*nit);
+          if (channelIt != channels.end())
+          {
+            fprintf(f, "    <channel%d ChannelName=\"%s_%s\" ChannelType=\"FloatArray\" ChannelInterpretation=\"%s\" SamplingType=\"Regular\" SamplingRate=\"%d\" StartTime=\"%d\" EndTime=\"%d\"/>\n",
+                    d++, shapeName.asChar(), nit->c_str(), nit->c_str(), timePerFrame, startTime, endTime);
+          }
         }
+        
+        for (std::set<std::string>::iterator nit = vectorChannelNames.begin(); nit != vectorChannelNames.end(); ++nit)
+        {
+          channelIt = channels.find(*nit);
+          if (channelIt != channels.end())
+          {
+            fprintf(f, "    <channel%d ChannelName=\"%s_%s\" ChannelType=\"FloatArray\" ChannelInterpretation=\"%s\" SamplingType=\"Regular\" SamplingRate=\"%d\" StartTime=\"%d\" EndTime=\"%d\"/>\n",
+                    d++, shapeName.asChar(), nit->c_str(), nit->c_str(), timePerFrame, startTime, endTime);
+          }
+        }
+        
+        fprintf(f, "    <channel%d ChannelName=\"%s_resolution\" ChannelType=\"FloatArray\" ChannelInterpretation=\"resolution\" SamplingType=\"Regular\" SamplingRate=\"%d\" StartTime=\"%d\" EndTime=\"%d\"/>\n",
+                d++, shapeName.asChar(), timePerFrame, startTime, endTime);
+        
+        fprintf(f, "    <channel%d ChannelName=\"%s_offset\" ChannelType=\"FloatArray\" ChannelInterpretation=\"offset\" SamplingType=\"Regular\" SamplingRate=\"%d\" StartTime=\"%d\" EndTime=\"%d\"/>\n",
+                d++, shapeName.asChar(), timePerFrame, startTime, endTime);
+        
+        fprintf(f, "  </Channels>\n");
+        fprintf(f, "</Autodesk_Cache_File>\n");
+        fprintf(f, "\n");
+        
+        fclose(f);
       }
-      
-      fprintf(f, "    <channel%d ChannelName=\"%s_resolution\" ChannelType=\"FloatArray\" ChannelInterpretation=\"resolution\" SamplingType=\"Regular\" SamplingRate=\"%d\" StartTime=\"%d\" EndTime=\"%d\"/>\n",
-              d++, shapeName.asChar(), timePerFrame, startTime, endTime);
-      
-      fprintf(f, "    <channel%d ChannelName=\"%s_offset\" ChannelType=\"FloatArray\" ChannelInterpretation=\"offset\" SamplingType=\"Regular\" SamplingRate=\"%d\" StartTime=\"%d\" EndTime=\"%d\"/>\n",
-              d++, shapeName.asChar(), timePerFrame, startTime, endTime);
-      
-      fprintf(f, "  </Channels>\n");
-      fprintf(f, "</Autodesk_Cache_File>\n");
-      fprintf(f, "\n");
-      
-      fclose(f);
       
       if (!xmlOnly)
       {
-        // Setup resolution, dimension
-        fluid.setSize(resolution[0], resolution[1], resolution[2], dimension[0], dimension[1], dimension[2], false);
+        MDGModifier dgmod;
+        MSelectionList sl;
         
-        // Setup dynamic offset
-        fluid.findPlug("autoResize").setBool(false);
-        fluid.findPlug("dynamicOffsetX").setFloat(0.0);
-        fluid.findPlug("dynamicOffsetX").setFloat(0.0);
-        fluid.findPlug("dynamicOffsetX").setFloat(0.0);
-        // This should be read each frame
+        // Get time node
+        MObject oTime;
+        sl.add("time1");
+        sl.getDependNode(0, oTime);
+        MFnDependencyNode nTime(oTime);
+        
+        // Setup Field3DInfo node
+        MObject oInfo = dgmod.createNode("Field3DInfo");
+        dgmod.doIt();
+        
+        MFnDependencyNode nInfo(oInfo);
+        
+        nInfo.findPlug("filename").setString(pat.c_str());
+        nInfo.findPlug("transformMode").setShort(1);
+        
+        dgmod.connect(nTime.findPlug("outTime"), nInfo.findPlug("time"));
+        dgmod.connect(nInfo.findPlug("outTranslate"), fluidTr.findPlug("translate"));
+        dgmod.connect(nInfo.findPlug("outRotate"), fluidTr.findPlug("rotate"));
+        dgmod.connect(nInfo.findPlug("outRotateOrder"), fluidTr.findPlug("rotateOrder"));
+        dgmod.connect(nInfo.findPlug("outRotateAxis"), fluidTr.findPlug("rotateAxis"));
+        dgmod.connect(nInfo.findPlug("outRotatePivot"), fluidTr.findPlug("rotatePivot"));
+        dgmod.connect(nInfo.findPlug("outRotatePivotTranslate"), fluidTr.findPlug("rotatePivotTranslate"));
+        dgmod.connect(nInfo.findPlug("outScale"), fluidTr.findPlug("scale"));
+        dgmod.connect(nInfo.findPlug("outScalePivot"), fluidTr.findPlug("scalePivot"));
+        dgmod.connect(nInfo.findPlug("outScalePivotTranslate"), fluidTr.findPlug("scalePivotTranslate"));
+        dgmod.connect(nInfo.findPlug("outShear"), fluidTr.findPlug("shear"));
+        dgmod.connect(nInfo.findPlug("outDimensionX"), fluid.findPlug("dimensionsW"));
+        dgmod.connect(nInfo.findPlug("outDimensionY"), fluid.findPlug("dimensionsH"));
+        dgmod.connect(nInfo.findPlug("outDimensionZ"), fluid.findPlug("dimensionsD"));
+        dgmod.doIt();
+        
+        // Setup rendering quality
+        fluid.findPlug("quality").setFloat(2.0f);
+        fluid.findPlug("renderInterpolator").setInt(3);
         
         // Setup grids
         fluid.findPlug("densityMethod").setInt(channels.find("density") != channels.end() ? 2 : 0);
