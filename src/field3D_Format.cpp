@@ -645,9 +645,9 @@ MStatus Field3dCacheFormat::writeArray(T &array)
    }
    
    double transform[4][4] = {{ 1.0, 0.0, 0.0, 0.0 },
-                             { 1.0, 1.0, 0.0, 0.0 },
-                             { 1.0, 0.0, 1.0, 0.0 },
-                             { 1.0, 0.0, 0.0, 1.0 }};
+                             { 0.0, 1.0, 0.0, 0.0 },
+                             { 0.0, 0.0, 1.0, 0.0 },
+                             { 0.0, 0.0, 0.0, 1.0 }};
    unsigned int resolution[3] = {0, 0, 0};
    double dimension[3] = {0.0, 0.0, 0.0};
    
@@ -689,8 +689,8 @@ MStatus Field3dCacheFormat::writeArray(T &array)
    
    // Test the type of array
    bool isVectorField = (m_outChannel == "velocity" ||
-                        m_outChannel == "color" ||
-                        m_outChannel == "texture");
+                         m_outChannel == "color" ||
+                         m_outChannel == "texture");
    
    if (!isVectorField)
    {

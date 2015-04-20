@@ -1,13 +1,18 @@
-#ifndef FIELD3D_MAYA_VRAYMATRIX
-#define FIELD3D_MAYA_VRAYMATRIX
+#ifndef FIELD3D_MAYA_INFO
+#define FIELD3D_MAYA_INFO
 
 #include <maya/MPxNode.h>
 #include <maya/MTransformationMatrix.h>
 #include <maya/MTime.h>
 #include <maya/MVector.h>
+#include <maya/MPoint.h>
+#include <maya/MMatrix.h>
 #include <maya/MString.h>
+#include <vector>
+#include <string>
+#include "field3D_Tools.h"
 
-class Field3DVRayMatrix : public MPxNode
+class Field3DInfo : public MPxNode
 {
 public:
    
@@ -15,7 +20,34 @@ public:
    
    static MObject aFilename;
    static MObject aTime;
+   static MObject aPartition;
+   static MObject aField;
+   static MObject aForceDimension;
+   static MObject aDimension;
+   static MObject aDimensionX;
+   static MObject aDimensionY;
+   static MObject aDimensionZ;
+   static MObject aTransformMode;
    
+   static MObject aOutPartitions;
+   static MObject aOutFields;
+   static MObject aOutResolution;
+   static MObject aOutResolutionX;
+   static MObject aOutResolutionY;
+   static MObject aOutResolutionZ;
+   static MObject aOutHasDimension;
+   static MObject aOutDimension;
+   static MObject aOutDimensionX;
+   static MObject aOutDimensionY;
+   static MObject aOutDimensionZ;
+   static MObject aOutHasOffset;
+   static MObject aOutOffset;
+   static MObject aOutOffsetX;
+   static MObject aOutOffsetY;
+   static MObject aOutOffsetZ;
+   static MObject aOutMatrix;
+   
+   // same as matrix but decomposed
    static MObject aOutScale;
    static MObject aOutScaleX;
    static MObject aOutScaleY;
@@ -56,8 +88,8 @@ public:
 
 public:
    
-   Field3DVRayMatrix();
-   virtual ~Field3DVRayMatrix();
+   Field3DInfo();
+   virtual ~Field3DInfo();
    
    virtual MStatus compute(const MPlug &plug, MDataBlock &data);
    
@@ -66,20 +98,51 @@ public:
    
 private:
    
+   enum TransformMode
+   {
+      TM_standard = 0,
+      TM_fluid
+   };
+   
    void reset();
-   void update(const MString &filename, MTime t, double eps=0.0001);
+   void resetOffset();
+   void resetDimension();
+   void resetResolution();
+   void resetTransform();
+   void resetFile();
+   void update(const MString &filename, MTime t,
+               const MString &partition, const MString &field,
+               bool forceDimension, const MPoint &dimension,
+               TransformMode transformMode,
+               double eps=0.0001);
    
    char *mBuffer;
    size_t mBufferLength;
+   bool mFirstUpdate;
    MString mLastFilename;
    std::string mFramePattern;
    MTime mLastTime;
+   MString mLastPartition;
+   MString mLastField;
+   bool mLastForceDimension;
+   MPoint mLastDimension;
+   TransformMode mLastTransformMode;
+   Field3D::Field3DInputFile *mFile;
+   Field3D::EmptyField<float>::Ptr mField;
    
+   std::vector<std::string> mPartitions;
+   std::vector<std::string> mFields;
+   MPoint mResolution;
+   bool mHasOffset;
+   MPoint mOffset;
+   bool mHasDimension;
+   MPoint mDimension;
    MVector mTranslate;
    double mRotate[3];
    MTransformationMatrix::RotationOrder mRotateOrder;
    double mScale[3];
    double mShear[3];
+   MMatrix mMatrix;
 };
 
 #endif
