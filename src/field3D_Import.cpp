@@ -321,7 +321,7 @@ MStatus importF3d::doIt(const MArgList &argList)
         }
       }
       
-      MString shapeName = (ns + partition).c_str();
+      MString shapeName = (ns + ":" + partition).c_str();
       
       if (!xmlOnly)
       {
@@ -329,7 +329,7 @@ MStatus importF3d::doIt(const MArgList &argList)
         
         if (!MNamespace::namespaceExists(ns.c_str()))
         {
-          MNamespace::addNamespace(ns.substr(0, ns.length()-1).c_str());
+          MNamespace::addNamespace(ns.c_str());
         }
         
         if (sl.add(shapeName) == MS::kSuccess)
@@ -369,11 +369,11 @@ MStatus importF3d::doIt(const MArgList &argList)
           size_t p = partition.find("Shape");
           if (p != std::string::npos)
           {
-            trName = (ns + partition.substr(0, p)).c_str();
+            trName = (ns + ":" + partition.substr(0, p)).c_str();
           }
           else
           {
-            trName = (ns + partition + "Xform").c_str();
+            trName = (ns + ":" + partition + "Xform").c_str();
           }
           
           dagmod.renameNode(trObj, trName);
