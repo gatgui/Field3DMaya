@@ -44,6 +44,7 @@ namespace MayaTools {
 MStatus getTransform ( std::string nodeName  , double (&transform)[4][4] );
 MStatus getFluidNode ( std::string fluidName , MFnFluid &fluid);
 MStatus getNodeValue ( MFnDependencyNode &node , const char *valueName, float &result );
+bool dirmap( std::string &path );
 
 }
 

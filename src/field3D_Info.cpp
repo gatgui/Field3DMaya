@@ -1,4 +1,5 @@
 #include "field3D_Info.h"
+#include "maya_Tools.h"
 #include <maya/MFnNumericAttribute.h>
 #include <maya/MFnTypedAttribute.h>
 #include <maya/MFnCompoundAttribute.h>
@@ -168,7 +169,7 @@ MStatus Field3DInfo::initialize()
   tattr.setReadable(true);
   tattr.setWritable(true);
   tattr.setKeyable(false);
-  tattr.setUsedAsFilename(true);
+  //tattr.setUsedAsFilename(true);
   stat = addAttribute(aFilename); CHECK_ERROR;
   
   aTime = uattr.create("time", "tm", MFnUnitAttribute::kTime, 0, &stat); CHECK_ERROR;
@@ -512,6 +513,9 @@ void Field3DInfo::update(const MString &filename, MTime t,
         // printf style frame pattern
         mFramePattern = filename.asChar();
       }
+      
+      // Do directory mapping ourselves
+      MayaTools::dirmap(mFramePattern);
       
       // MGlobal::displayInfo(MString("Use frame pattern: ") + mFramePattern.c_str());
     }

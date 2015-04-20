@@ -48,6 +48,20 @@ using namespace std;
 
 namespace MayaTools {
 
+bool dirmap( std::string &path ) {
+  MString rv = "";
+  
+  if (MGlobal::executeCommand(MString("dirmap -cd \"") + path.c_str() + "\"", rv) == MS::kSuccess)
+  {
+    path = rv.asChar();
+    return true;
+  }
+  else
+  {
+    return false;
+  }
+}
+
 MStatus getDagPath( string nodeName , MDagPath &dagPath , MFn::Type type = MFn::kInvalid) {
 
   MSelectionList sl;
