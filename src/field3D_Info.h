@@ -46,6 +46,9 @@ public:
    static MObject aOutOffsetY;
    static MObject aOutOffsetZ;
    static MObject aOutMatrix;
+   static MObject aOutMatrixInverse;
+   static MObject aOutRawMatrix;
+   static MObject aOutRawMatrixInverse;
    
    // same as matrix but decomposed
    static MObject aOutScale;
@@ -100,8 +103,10 @@ private:
    
    enum TransformMode
    {
-      TM_standard = 0,
-      TM_fluid
+      TM_raw = 0,
+      TM_fluid,
+      TM_raw_inverse,
+      TM_fluid_inverse
    };
    
    void reset();
@@ -143,6 +148,9 @@ private:
    double mScale[3];
    double mShear[3];
    MMatrix mMatrix;
+   MMatrix mMatrixInverse;
+   MMatrix mRawMatrix;
+   MMatrix mRawMatrixInverse;
 };
 
 #endif

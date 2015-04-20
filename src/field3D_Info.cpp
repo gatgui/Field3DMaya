@@ -44,6 +44,9 @@ MObject Field3DInfo::aOutOffsetX;
 MObject Field3DInfo::aOutOffsetY;
 MObject Field3DInfo::aOutOffsetZ;
 MObject Field3DInfo::aOutMatrix;
+MObject Field3DInfo::aOutMatrixInverse;
+MObject Field3DInfo::aOutRawMatrix;
+MObject Field3DInfo::aOutRawMatrixInverse;
 
 MObject Field3DInfo::aOutScale;
 MObject Field3DInfo::aOutScaleX;
@@ -141,7 +144,10 @@ MObject Field3DInfo::aOutTranslateZ;
   attributeAffects(attr, aOutScalePivot);\
   attributeAffects(attr, aOutScalePivotTranslate);\
   attributeAffects(attr, aOutShear);\
-  attributeAffects(attr, aOutMatrix)
+  attributeAffects(attr, aOutMatrix);\
+  attributeAffects(attr, aOutMatrixInverse);\
+  attributeAffects(attr, aOutRawMatrix);\
+  attributeAffects(attr, aOutRawMatrixInverse);
 
 
 void* Field3DInfo::creator()
@@ -197,8 +203,10 @@ MStatus Field3DInfo::initialize()
   eattr.setReadable(true);
   eattr.setWritable(true);
   eattr.setKeyable(false);
-  eattr.addField("standard", 0);
+  eattr.addField("raw", 0);
   eattr.addField("fluid", 1);
+  eattr.addField("raw_inverse", 2);
+  eattr.addField("fluid_inverse", 3);
   stat = addAttribute(aTransformMode); CHECK_ERROR;
   
   aForceDimension = nattr.create("forceDimension", "fdi", MFnNumericData::kBoolean, 0, &stat); CHECK_ERROR;
@@ -256,6 +264,27 @@ MStatus Field3DInfo::initialize()
   tattr.setWritable(false);
   tattr.setHidden(true);
   stat = addAttribute(aOutMatrix); CHECK_ERROR;
+  
+  aOutMatrixInverse = tattr.create("outMatrixInverse", "omti", MFnData::kMatrix, MObject::kNullObj, &stat); CHECK_ERROR;
+  tattr.setStorable(false);
+  tattr.setReadable(true);
+  tattr.setWritable(false);
+  tattr.setHidden(true);
+  stat = addAttribute(aOutMatrixInverse); CHECK_ERROR;
+  
+  aOutRawMatrix = tattr.create("outRawMatrix", "ormx", MFnData::kMatrix, MObject::kNullObj, &stat); CHECK_ERROR;
+  tattr.setStorable(false);
+  tattr.setReadable(true);
+  tattr.setWritable(false);
+  tattr.setHidden(true);
+  stat = addAttribute(aOutRawMatrix); CHECK_ERROR;
+  
+  aOutRawMatrixInverse = tattr.create("outRawMatrixInverse", "ormi", MFnData::kMatrix, MObject::kNullObj, &stat); CHECK_ERROR;
+  tattr.setStorable(false);
+  tattr.setReadable(true);
+  tattr.setWritable(false);
+  tattr.setHidden(true);
+  stat = addAttribute(aOutRawMatrixInverse); CHECK_ERROR;
   
   aOutRotateOrder = eattr.create("outRotateOrder", "oro", 0, &stat); CHECK_ERROR;
   eattr.addField("xyz", 0);
@@ -355,7 +384,7 @@ Field3DInfo::Field3DInfo()
    , mFirstUpdate(true)
    , mLastForceDimension(false)
    , mLastDimension(1, 1, 1)
-   , mLastTransformMode(Field3DInfo::TM_standard)
+   , mLastTransformMode(Field3DInfo::TM_raw)
    , mFile(0)
 {
   reset();
@@ -433,6 +462,9 @@ void Field3DInfo::resetTransform()
   mShear[2] = 0.0;
   
   mMatrix.setToIdentity();
+  mRawMatrix.setToIdentity();
+  mMatrixInverse.setToIdentity();
+  mRawMatrixInverse.setToIdentity();
 }
 
 void Field3DInfo::update(const MString &filename, MTime t,
@@ -638,14 +670,16 @@ void Field3DInfo::update(const MString &filename, MTime t,
         
         if (mapping)
         {
-          mMatrix = MMatrix(mapping->localToWorld().x);
+          mRawMatrix = MMatrix(mapping->localToWorld().x);
         }
         else
         {
-          mMatrix.setToIdentity();
+          mRawMatrix.setToIdentity();
         }
         
-        if (transformMode == TM_fluid)
+        mRawMatrixInverse = mRawMatrix.inverse();
+        
+        if (transformMode == TM_fluid || transformMode == TM_fluid_inverse)
         {
           static double sMapTo01[4][4] = {{  1.0 ,  0.0 ,  0.0 , 0.0 } ,
                                           {  0.0 ,  1.0 ,  0.0 , 0.0 } ,
@@ -667,7 +701,7 @@ void Field3DInfo::update(const MString &filename, MTime t,
           // mMatrix = mapTo01 * Mdim * Moff * xform
           // xform = Moffset^1 * Mdim^1 * mapTo01^-1 * mMatrix 
           
-          mMatrix = Moff.inverse() * Mdim.inverse() * mapTo01.inverse() * mMatrix;
+          mMatrix = Moff.inverse() * Mdim.inverse() * mapTo01.inverse() * mRawMatrix;
           
           if (forceDimension)
           {
@@ -686,8 +720,14 @@ void Field3DInfo::update(const MString &filename, MTime t,
             mMatrix = Mdim * Moff * mMatrix;
           }
         }
-      
-        MTransformationMatrix xform = mMatrix;
+        else
+        {
+          mMatrix = mRawMatrix;
+        }
+        
+        mMatrixInverse = mMatrix.inverse();
+        
+        MTransformationMatrix xform = (transformMode >= TM_raw_inverse ? mMatrixInverse : mMatrix);
         
         mTranslate = xform.getTranslation(MSpace::kTransform);
         xform.getRotation(mRotate, mRotateOrder);
@@ -886,6 +926,21 @@ MStatus Field3DInfo::compute(const MPlug &plug, MDataBlock &data)
   {
     MDataHandle hOut = data.outputValue(aOutMatrix);
     hOut.set(mMatrix);
+  }
+  else if (oAttr == aOutMatrixInverse)
+  {
+    MDataHandle hOut = data.outputValue(aOutMatrixInverse);
+    hOut.set(mMatrixInverse);
+  }
+  else if (oAttr == aOutRawMatrix)
+  {
+    MDataHandle hOut = data.outputValue(aOutRawMatrix);
+    hOut.set(mRawMatrix);
+  }
+  else if (oAttr == aOutRawMatrixInverse)
+  {
+    MDataHandle hOut = data.outputValue(aOutRawMatrixInverse);
+    hOut.set(mRawMatrixInverse);
   }
   // Translation
   else if (oAttr == aOutTranslate)
