@@ -22,20 +22,31 @@ public:
    static MObject aTime;
    static MObject aPartition;
    static MObject aField;
-   static MObject aOverrideOffset;
-   static MObject aOffset;
-   static MObject aOverrideDimension;
+   static MObject aForceDimension;
    static MObject aDimension;
+   static MObject aDimensionX;
+   static MObject aDimensionY;
+   static MObject aDimensionZ;
    static MObject aTransformMode;
    
    static MObject aOutPartitions;
    static MObject aOutFields;
    static MObject aOutResolution;
+   static MObject aOutResolutionX;
+   static MObject aOutResolutionY;
+   static MObject aOutResolutionZ;
    static MObject aOutHasDimension;
    static MObject aOutDimension;
+   static MObject aOutDimensionX;
+   static MObject aOutDimensionY;
+   static MObject aOutDimensionZ;
    static MObject aOutHasOffset;
    static MObject aOutOffset;
+   static MObject aOutOffsetX;
+   static MObject aOutOffsetY;
+   static MObject aOutOffsetZ;
    static MObject aOutMatrix;
+   
    // same as matrix but decomposed
    static MObject aOutScale;
    static MObject aOutScaleX;
@@ -89,10 +100,8 @@ private:
    
    enum TransformMode
    {
-      TM_full = 0,
-      TM_no_dim,
-      TM_no_off,
-      TM_no_dim_and_off
+      TM_standard = 0,
+      TM_fluid
    };
    
    void reset();
@@ -103,20 +112,23 @@ private:
    void resetFile();
    void update(const MString &filename, MTime t,
                const MString &partition, const MString &field,
-               bool overrideOffset, const MPoint &offset,
-               bool overrideDimension, const MPoint &dimension,
+               bool forceDimension, const MPoint &dimension,
                TransformMode transformMode,
                double eps=0.0001);
    
    char *mBuffer;
    size_t mBufferLength;
+   bool mFirstUpdate;
    MString mLastFilename;
    std::string mFramePattern;
    MTime mLastTime;
    MString mLastPartition;
    MString mLastField;
+   bool mLastForceDimension;
+   MPoint mLastDimension;
    TransformMode mLastTransformMode;
    Field3D::Field3DInputFile *mFile;
+   Field3D::EmptyField<float>::Ptr mField;
    
    std::vector<std::string> mPartitions;
    std::vector<std::string> mFields;
