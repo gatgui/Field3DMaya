@@ -50,43 +50,25 @@ namespace MayaTools {
 
 MStatus getDagPath( string nodeName , MDagPath &dagPath , MFn::Type type = MFn::kInvalid) {
 
-  // Initialisation of the DAG traversal
-  MStatus status                      = MS::kSuccess;
-  MItDag::TraversalType traversalType = MItDag::kDepthFirst;
-  MFn::Type filterType                = type;
-
-  // Traversal start
-  MItDag dagIterator( traversalType, filterType, &status);
-  CHECK_MSTATUS_AND_RETURN_IT(status);
-
-  // traversal
-  for ( ; !dagIterator.isDone(); dagIterator.next() ) {
-
-    // DAG path
-    status = dagIterator.getPath(dagPath);
-    if( status != MS::kSuccess ) {
-      CHECK_MSTATUS(status);
-      continue;
-    }
-
-    // DAG node corresponding to this DAG Path
-    MFnDagNode dagNode(dagPath, &status);
-    if( status != MS::kSuccess ) {
-      CHECK_MSTATUS(status);
-      continue;
-    }
-
-    if( nodeName == dagNode.name().asChar() ) return MS::kSuccess;
-
+  MSelectionList sl;
+  
+  if (sl.add(nodeName.c_str()) == MS::kSuccess &&
+      sl.getDagPath(0, dagPath) == MS::kSuccess &&
+      (type == MFn::kInvalid || dagPath.hasFn(type)))
+  {
+    return MS::kSuccess;
   }
-  return MS::kNotFound;
+  else
+  {
+    return MS::kNotFound;
+  }
 }
 
 
 MStatus getTransform( string nodeName , double (&transform)[4][4] ) {
 
   MDagPath dagPath;
-  CHECK_MSTATUS_AND_RETURN_IT( getDagPath(nodeName,dagPath) ) ;
+  CHECK_MSTATUS_AND_RETURN_IT( getDagPath(nodeName, dagPath) ) ;
 
   MStatus status     = MS::kSuccess;
   MMatrix transformM = dagPath.inclusiveMatrix(&status);
@@ -104,13 +86,9 @@ MStatus getFluidNode(string fluidName, MFnFluid &fluid) {
   // get the corresponding DAG Path
   MDagPath dagPath;
 
-  CHECK_MSTATUS_AND_RETURN_IT( getDagPath( fluidName , dagPath , MFn::kFluid) );
-  // test if the object is a fluid
-  MObject node = dagPath.node();
-  if( fluid.hasObj(node) && fluid.setObject(node) == MS::kSuccess) return MS::kSuccess;
-
-  return MS::kFailure;
-
+  CHECK_MSTATUS_AND_RETURN_IT( getDagPath( fluidName, dagPath, MFn::kFluid) );
+  
+  return fluid.setObject(dagPath);
 }
 
 
