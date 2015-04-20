@@ -197,7 +197,7 @@ exportF3d::exportF3d()
   m_ignoreFalloff = false;
   
   m_numOversample = 0;
-  m_forNCache = false;
+  m_xml = false;
   
   m_sparse = false;
   m_sparseBlockOrder = 4;
@@ -206,7 +206,7 @@ exportF3d::exportF3d()
   m_sparseVectorDefault[0] = 0.0;
   m_sparseVectorDefault[1] = 0.0;
   m_sparseVectorDefault[2] = 0.0;
-  m_half = false;
+  m_format = Field3DTools::HALF;
 }
 
 //----------------------------------------------------------------------------//
@@ -223,8 +223,7 @@ MSyntax exportF3d::newSyntax()
   MStatus stat;
   stat = syntax.addFlag("-st",  "-startTime", MSyntax::kLong); ERRCHK;    
   stat = syntax.addFlag("-et",  "-endTime", MSyntax::kLong); ERRCHK;  
-  stat = syntax.addFlag("-od",  "-outputDir", MSyntax::kString); ERRCHK; 
-  stat = syntax.addFlag("-on",  "-outputName", MSyntax::kString); ERRCHK; 
+  stat = syntax.addFlag("-f",   "-file", MSyntax::kString); ERRCHK; 
   stat = syntax.addFlag("-id",  "-ignoreDensity", MSyntax::kNoArg); ERRCHK; 
   stat = syntax.addFlag("-itm", "-ignoreTemperature", MSyntax::kNoArg); ERRCHK; 
   stat = syntax.addFlag("-ifu", "-ignoreFuel", MSyntax::kNoArg); ERRCHK; 
@@ -234,13 +233,13 @@ MSyntax exportF3d::newSyntax()
   stat = syntax.addFlag("-itx", "-ignoreTexture", MSyntax::kNoArg); ERRCHK; 
   stat = syntax.addFlag("-ifa", "-ignoreFalloff", MSyntax::kNoArg); ERRCHK; 
   stat = syntax.addFlag("-ns",  "-numOversample", MSyntax::kLong); ERRCHK; 
-  stat = syntax.addFlag("-fnc", "-forNCache", MSyntax::kNoArg); ERRCHK;
-  stat = syntax.addFlag("-sp",  "-sparse", MSyntax::kBoolean); ERRCHK;
+  stat = syntax.addFlag("-xml", "-genXML", MSyntax::kNoArg); ERRCHK;
+  stat = syntax.addFlag("-sp",  "-sparse", MSyntax::kNoArg); ERRCHK;
   stat = syntax.addFlag("-spt", "-sparseThreshold", MSyntax::kDouble); ERRCHK;
   stat = syntax.addFlag("-sbo", "-sparseBlockOrder", MSyntax::kLong); ERRCHK;
   stat = syntax.addFlag("-ssd", "-sparseScalarDefault", MSyntax::kDouble); ERRCHK;
   stat = syntax.addFlag("-svd", "-sparseVectorDefault", MSyntax::kDouble, MSyntax::kDouble, MSyntax::kDouble); ERRCHK;
-  stat = syntax.addFlag("-hf",  "-half", MSyntax::kBoolean); ERRCHK;
+  stat = syntax.addFlag("-fmt", "-format", MSyntax::kString); ERRCHK;
   stat = syntax.addFlag("-rc",  "-remapChannels", MSyntax::kString); ERRCHK;
   
   stat = syntax.addFlag("-d", "-debug");ERRCHK; 
@@ -267,8 +266,7 @@ MStatus exportF3d::parseArgs( const MArgList &args )
       "\nexportF3d is used to export 3D fluid data to either f3d\n"
       "Synopsis: exportF3d [flags] [fluidObject... ]\n"
       "Flags:\n"
-      "    -od    -outputDir           string   Output directory\n"
-      "    -on    -outputName          string   Output base name (can contain printf like frame pattern)\n"
+      "    -f     -file                string   Output file\n"
       "    -st    -startTime           int      Start of simulation\n"
       "    -et    -endTime             int      End of simulation\n"
       "    -id    -ignoreDensity                Don't output 'density' field\n"
@@ -281,17 +279,15 @@ MStatus exportF3d::parseArgs( const MArgList &args )
       "    -ap    -addPressure                  Output 'pressure' field\n"
       "    -ns    -numOversample       int      Oversamples the solver with N sub frame(s) but\n"
       "                                           only writes out whole frame sim data\n"
-      "    -sp    -sparse              bool     Output sparse field or not (false by default)\n"    
+      "    -sp    -sparse                       Output sparse field\n"
       "    -spt   -sparseThreshold     float    Sparse field threshold (0.0000001 by default)\n"
       "    -sbo   -sparseBlockOrder    int      Sparse block order (4 by default for blocks of up to 16x16x16 voxels)\n"
       "    -ssd   -sparseScalarDefault float    Sparse block default value for scalar fields (0 by default)\n"
       "    -svd   -sparseVectorDefault float3   Sparse block default value for vector fields (0, 0, 0 by default)\n"
-      "    -hf    -half                bool     Output half float fields or not (false by default)\n"
+      "    -fmt   -format              string   Output format (half|float|double, half by default)\n"
       "    -rc    -remapChannels       string   Remap fluid channels (',' separated list of oldName=newName)\n"
       "                                           (default is 'velocity=v_mac,color=Cd,texture=coord'\n"
-      "    -fnc   -forNCache                    Format file and field names to be nCache compatible\n"
-      "                                           Overrides output filename to <outputDir>/<outputName>Frame<frame>.f3d\n"
-      "                                           Note: default channel name remapping is ignored\n"
+      "    -xml   -genXML                       Generate an XML file usable to import using maya fluid cache\n"
       "    -d     -debug\n"
       "    -h     -help\n"
       "Example:\n"
@@ -306,9 +302,9 @@ MStatus exportF3d::parseArgs( const MArgList &args )
     m_verbose = true;
   }
   
-  if (!argData.isFlagSet("-outputDir") )
+  if (!argData.isFlagSet("-file") )
   {
-    MGlobal::displayInfo("outputDir is required");
+    MGlobal::displayInfo("-f/-file is required");
     return MS::kFailure;            
   }
 
@@ -334,19 +330,27 @@ MStatus exportF3d::parseArgs( const MArgList &args )
   m_ignorePressure = !argData.isFlagSet("-addPressure");
   m_ignoreTexture = argData.isFlagSet("-ignoreTexture");
   m_ignoreFalloff = argData.isFlagSet("-ignoreFalloff");
-  m_forNCache = argData.isFlagSet("-forNCache");
+  m_xml = argData.isFlagSet("-genXML");
+  m_sparse = argData.isFlagSet("-sparse");
   m_remapChannels.clear();
-    
-  if (argData.isFlagSet("-outputDir"))
+  
+  MString outFile;
+  status = argData.getFlagArgument("-file", 0, outFile);
+  int p0 = outFile.rindexW('\\');
+  int p1 = outFile.rindexW('/');
+  int p = (p0 > p1 ? p0 : p1);
+  
+  if (p > 0)
   {
-    status = argData.getFlagArgument("-outputDir", 0, m_outputDir);
+     m_outputDir = outFile.substringW(0, p - 1);
+     m_outputName = outFile.substringW(p + 1, outFile.numChars() - 1);
+  }
+  else
+  {
+     m_outputDir = ".";
+     m_outputName = outFile;
   }
   
-  if (argData.isFlagSet("-outputName"))
-  {
-    status = argData.getFlagArgument("-outputName", 0, m_outputName);
-  }
-
   if (argData.isFlagSet("-numOversample"))
   {
     status = argData.getFlagArgument("-numOversample", 0, m_numOversample);
@@ -355,11 +359,6 @@ MStatus exportF3d::parseArgs( const MArgList &args )
       m_numOversample = 0;
       MGlobal::displayWarning("numOversample can't be less than zero, setting it to 1");
     }
-  }
-  
-  if (argData.isFlagSet("-sparse"))
-  {
-    argData.getFlagArgument("-sparse", 0, m_sparse);
   }
   
   if (m_sparse)
@@ -384,10 +383,28 @@ MStatus exportF3d::parseArgs( const MArgList &args )
     }
   }
   
-  if (argData.isFlagSet("-half"))
+  if (argData.isFlagSet("-format"))
   {
-    argData.getFlagArgument("-half", 0, m_half);
+    MString fmt = "half";
+    argData.getFlagArgument("-format", 0, fmt);
+    if (fmt == "double")
+    {
+      m_format = Field3DTools::DOUBLE;
+    }
+    else if (fmt == "float")
+    {
+      m_format = Field3DTools::FLOAT;
+    }
+    else
+    {
+      MGlobal::displayInfo("exportF3d: Invalid format \"" + fmt + "\", defaulting to \"half\"");
+      m_format = Field3DTools::HALF;
+    }
   }
+  
+  m_remapChannels["velocity"] = "v_mac";
+  m_remapChannels["color"] = "Cd";
+  m_remapChannels["texture"] = "coord";
   
   if (argData.isFlagSet("-remapChannels"))
   {
@@ -417,15 +434,6 @@ MStatus exportF3d::parseArgs( const MArgList &args )
           m_remapChannels[from] = to;
         }
       }
-    }
-  }
-  else
-  {
-    if (!m_forNCache)
-    {
-      m_remapChannels["velocity"] = "v_mac";
-      m_remapChannels["color"] = "Cd";
-      m_remapChannels["texture"] = "coord";
     }
   }
   
@@ -468,6 +476,9 @@ MStatus exportF3d::doIt(const MArgList& args)
   float currentFrame = MAnimControl::currentTime().value();
 
   MItSelectionList selListIter(m_slist, MFn::kFluid, &status);  
+  
+  // ToDo: support multiple shape export
+  //       -> generate one XML file per shape
   
   for (; !selListIter.isDone(); selListIter.next())
   {
@@ -571,6 +582,13 @@ MStatus exportF3d::doIt(const MArgList& args)
     char tmp[4096];
     size_t p = 0;
     
+    std::string shapeName = fluidFn.name().asChar();
+    p = shapeName.rfind(':');
+    if (p != std::string::npos)
+    {
+      shapeName = shapeName.substr(p + 1);
+    }
+    
     // setup output base name
     if (m_outputName.length() > 0)
     {
@@ -578,13 +596,7 @@ MStatus exportF3d::doIt(const MArgList& args)
     }
     else
     {
-      fluidName = fluidFn.name().asChar();
-      
-      p = fluidName.rfind(':');
-      if (p != std::string::npos)
-      {
-        fluidName = fluidName.substr(p + 1);
-      }
+      fluidName = shapeName;
     }
     
     // remove .f3d extension if any
@@ -612,16 +624,38 @@ MStatus exportF3d::doIt(const MArgList& args)
       
       hasFramePattern = (p1 < n && fluidName[p1] == 'd');
     }
-    
-    // remove frame pattern when making nCache compatible sequence
-    if (m_forNCache && hasFramePattern)
+    // check for # pattern and replace by printf-like one
+    if (!hasFramePattern)
     {
-      // p still contains the position of the '%'
-      size_t p1 = fluidName.find('d', p);
+      p = fluidName.rfind('#');
       
-      fluidName = fluidName.substr(0, p) + fluidName.substr(p1 + 1);
-      
-      hasFramePattern = false;
+      if (p != std::string::npos)
+      {
+        size_t p1 = fluidName.find_last_not_of("#", p);
+        
+        if (p1 != std::string::npos)
+        {
+          size_t n = p - p1;
+          
+          std::string tail = fluidName.substr(p + 1);
+          
+          fluidName = fluidName.substr(0, p1 + 1);
+          
+          if (n > 1)
+          {
+            sprintf(tmp, "%%0%lud", n);
+            fluidName += tmp;
+          }
+          else
+          {
+            fluidName += "%d";
+          }
+          
+          fluidName += tail;
+          
+          hasFramePattern = true;
+        }
+      }
     }
     
     // remove trailing '.' if any
@@ -634,12 +668,7 @@ MStatus exportF3d::doIt(const MArgList& args)
     // setup file pattern
     std::string filePattern = fluidName;
     
-    if (m_forNCache)
-    {
-      sprintf(tmp, "%sFrame%%d.f3d", fluidName.c_str());
-      filePattern = tmp;
-    }
-    else if (!hasFramePattern)
+    if (!hasFramePattern)
     {
       sprintf(tmp, "%s.%%04d.f3d", fluidName.c_str());
       filePattern = tmp;
@@ -657,6 +686,8 @@ MStatus exportF3d::doIt(const MArgList& args)
     
     int numOversample = 0;
     double dt = 1.0;
+    
+    MTime ct = MAnimControl::currentTime();
     
     MTime t(double(m_start) - 1.0, MTime::uiUnit());
     
@@ -688,24 +719,32 @@ MStatus exportF3d::doIt(const MArgList& args)
       
       if (m_sparse)
       {
-        if (m_half)
+        switch (m_format)
         {
-          setF3dField<SparseFieldh, SparseField3h, MACField3h>(fluidFn, fluidPath.asChar(), dagPath);
-        }
-        else
-        {
+        case Field3DTools::DOUBLE:
+          setF3dField<SparseFieldd, SparseField3d, MACField3d>(fluidFn, fluidPath.asChar(), dagPath);
+          break;
+        case Field3DTools::FLOAT:
           setF3dField<SparseFieldf, SparseField3f, MACField3f>(fluidFn, fluidPath.asChar(), dagPath);
+          break;
+        case Field3DTools::HALF:
+        default:
+          setF3dField<SparseFieldh, SparseField3h, MACField3h>(fluidFn, fluidPath.asChar(), dagPath);
         }
       }
       else
       {
-        if (m_half)
+        switch (m_format)
         {
-          setF3dField<DenseFieldh, DenseField3h, MACField3h>(fluidFn, fluidPath.asChar(), dagPath);
-        }
-        else
-        {
+        case Field3DTools::DOUBLE:
+          setF3dField<DenseFieldd, DenseField3d, MACField3d>(fluidFn, fluidPath.asChar(), dagPath);
+          break;
+        case Field3DTools::FLOAT:
           setF3dField<DenseFieldf, DenseField3f, MACField3f>(fluidFn, fluidPath.asChar(), dagPath);
+          break;
+        case Field3DTools::HALF:
+        default:
+          setF3dField<DenseFieldh, DenseField3h, MACField3h>(fluidFn, fluidPath.asChar(), dagPath);
         }
       }
       
@@ -716,8 +755,10 @@ MStatus exportF3d::doIt(const MArgList& args)
 
     computation.endComputation(); 
     
+    MAnimControl::setCurrentTime(ct);
+    
     // generate .xml for nCache compatible output
-    if (m_forNCache)
+    if (m_xml)
     {
       if (m_verbose)
       {
@@ -735,7 +776,7 @@ MStatus exportF3d::doIt(const MArgList& args)
       std::string xmlPath = m_outputDir.asChar();
       
       xmlPath += "/";
-      xmlPath += fluidName;
+      xmlPath += shapeName;
       xmlPath += ".xml";
       
       FILE *f = fopen(xmlPath.c_str(), "w");
@@ -750,56 +791,75 @@ MStatus exportF3d::doIt(const MArgList& args)
       t.setValue(m_end);
       int EndTime = int(floor(t.asUnits(MTime::k6000FPS)));
       
+      std::string fmt = "half";
+      switch (m_format)
+      {
+      case Field3DTools::DOUBLE:
+        fmt = "double";
+        break;
+      case Field3DTools::FLOAT:
+        fmt = "double";
+      default:
+        break;
+      }
+      
       fprintf(f, "<?xml version=\"1.0\"?>\n");
       fprintf(f, "<Autodesk_Cache_File>\n");
-      fprintf(f, "  <cacheType Type=\"OneFilePerFrame\" Format=\"f3d_%s_%s\"/>\n", (m_sparse ? "sparse" : "dense"), (m_half ? "half" : "float"));
+      fprintf(f, "  <cacheType Type=\"OneFilePerFrame\" Format=\"f3d_%s_%s\"/>\n", (m_sparse ? "sparse" : "dense"), fmt.c_str());
       fprintf(f, "  <time Range=\"%d-%d\"/>\n", StartTime, EndTime);
       fprintf(f, "  <cacheTimePerFrame TimePerFrame=\"%d\"/>\n", TimePerFrame);
       fprintf(f, "  <cacheVersion Version=\"2.0\"/>\n");
       fprintf(f, "  <extra>f3d.file=%s</extra>\n", filePattern.c_str());
+      for (std::map<std::string, std::string>::const_iterator rit = m_remapChannels.begin(); rit != m_remapChannels.end(); ++rit)
+      {
+        if (m_exportedChannels.find(rit->first) != m_exportedChannels.end())
+        {
+          fprintf(f, "  <extra>f3d.remap=%s:%s</extra>\n", rit->first.c_str(), rit->second.c_str());
+        }
+      }
       fprintf(f, "  <Channels>\n");
       
       int d = 0;
       
       if (m_hasDensity)
       {
-        fprintf(f, "    <channel%d ChannelName=\"%s_%s\" ChannelType=\"FloatArray\" ChannelInterpretation=\"density\" SamplingType=\"Regular\" SamplingRate=\"%d\" StartTime=\"%d\" EndTime=\"%d\"/>\n",
-                d++, dagPath.partialPathName().asChar(), remapChannel("density").c_str(), TimePerFrame, StartTime, EndTime);
+        fprintf(f, "    <channel%d ChannelName=\"%s_density\" ChannelType=\"FloatArray\" ChannelInterpretation=\"density\" SamplingType=\"Regular\" SamplingRate=\"%d\" StartTime=\"%d\" EndTime=\"%d\"/>\n",
+                d++, dagPath.partialPathName().asChar(), TimePerFrame, StartTime, EndTime);
       }
       if (m_hasVelocity)
       {
-        fprintf(f, "    <channel%d ChannelName=\"%s_%s\" ChannelType=\"FloatArray\" ChannelInterpretation=\"velocity\" SamplingType=\"Regular\" SamplingRate=\"%d\" StartTime=\"%d\" EndTime=\"%d\"/>\n",
-                d++, dagPath.partialPathName().asChar(), remapChannel("velocity").c_str(), TimePerFrame, StartTime, EndTime);
+        fprintf(f, "    <channel%d ChannelName=\"%s_velocity\" ChannelType=\"FloatArray\" ChannelInterpretation=\"velocity\" SamplingType=\"Regular\" SamplingRate=\"%d\" StartTime=\"%d\" EndTime=\"%d\"/>\n",
+                d++, dagPath.partialPathName().asChar(), TimePerFrame, StartTime, EndTime);
       }
       if (m_hasTemperature)
       {
-        fprintf(f, "    <channel%d ChannelName=\"%s_%s\" ChannelType=\"FloatArray\" ChannelInterpretation=\"temperature\" SamplingType=\"Regular\" SamplingRate=\"%d\" StartTime=\"%d\" EndTime=\"%d\"/>\n",
-                d++, dagPath.partialPathName().asChar(), remapChannel("temperature").c_str(), TimePerFrame, StartTime, EndTime);
+        fprintf(f, "    <channel%d ChannelName=\"%s_temperature\" ChannelType=\"FloatArray\" ChannelInterpretation=\"temperature\" SamplingType=\"Regular\" SamplingRate=\"%d\" StartTime=\"%d\" EndTime=\"%d\"/>\n",
+                d++, dagPath.partialPathName().asChar(), TimePerFrame, StartTime, EndTime);
       }
       if (m_hasFuel)
       {
-        fprintf(f, "    <channel%d ChannelName=\"%s_%s\" ChannelType=\"FloatArray\" ChannelInterpretation=\"fuel\" SamplingType=\"Regular\" SamplingRate=\"%d\" StartTime=\"%d\" EndTime=\"%d\"/>\n",
-                d++, dagPath.partialPathName().asChar(), remapChannel("fuel").c_str(), TimePerFrame, StartTime, EndTime);
+        fprintf(f, "    <channel%d ChannelName=\"%s_fuel\" ChannelType=\"FloatArray\" ChannelInterpretation=\"fuel\" SamplingType=\"Regular\" SamplingRate=\"%d\" StartTime=\"%d\" EndTime=\"%d\"/>\n",
+                d++, dagPath.partialPathName().asChar(), TimePerFrame, StartTime, EndTime);
       }
       if (m_hasPressure)
       {
-        fprintf(f, "    <channel%d ChannelName=\"%s_%s\" ChannelType=\"FloatArray\" ChannelInterpretation=\"pressure\" SamplingType=\"Regular\" SamplingRate=\"%d\" StartTime=\"%d\" EndTime=\"%d\"/>\n",
-                d++, dagPath.partialPathName().asChar(), remapChannel("pressure").c_str(), TimePerFrame, StartTime, EndTime);
+        fprintf(f, "    <channel%d ChannelName=\"%s_pressure\" ChannelType=\"FloatArray\" ChannelInterpretation=\"pressure\" SamplingType=\"Regular\" SamplingRate=\"%d\" StartTime=\"%d\" EndTime=\"%d\"/>\n",
+                d++, dagPath.partialPathName().asChar(), TimePerFrame, StartTime, EndTime);
       }
       if (m_hasFalloff)
       {
-        fprintf(f, "    <channel%d ChannelName=\"%s_%s\" ChannelType=\"FloatArray\" ChannelInterpretation=\"falloff\" SamplingType=\"Regular\" SamplingRate=\"%d\" StartTime=\"%d\" EndTime=\"%d\"/>\n",
-                d++, dagPath.partialPathName().asChar(), remapChannel("falloff").c_str(), TimePerFrame, StartTime, EndTime);
+        fprintf(f, "    <channel%d ChannelName=\"%s_falloff\" ChannelType=\"FloatArray\" ChannelInterpretation=\"falloff\" SamplingType=\"Regular\" SamplingRate=\"%d\" StartTime=\"%d\" EndTime=\"%d\"/>\n",
+                d++, dagPath.partialPathName().asChar(), TimePerFrame, StartTime, EndTime);
       }
       if (m_hasColor)
       {
-        fprintf(f, "    <channel%d ChannelName=\"%s_%s\" ChannelType=\"FloatArray\" ChannelInterpretation=\"color\" SamplingType=\"Regular\" SamplingRate=\"%d\" StartTime=\"%d\" EndTime=\"%d\"/>\n",
-                d++, dagPath.partialPathName().asChar(), remapChannel("color").c_str(), TimePerFrame, StartTime, EndTime);
+        fprintf(f, "    <channel%d ChannelName=\"%s_color\" ChannelType=\"FloatArray\" ChannelInterpretation=\"color\" SamplingType=\"Regular\" SamplingRate=\"%d\" StartTime=\"%d\" EndTime=\"%d\"/>\n",
+                d++, dagPath.partialPathName().asChar(), TimePerFrame, StartTime, EndTime);
       }
       if (m_hasTexture)
       {
-        fprintf(f, "    <channel%d ChannelName=\"%s_%s\" ChannelType=\"FloatArray\" ChannelInterpretation=\"texture\" SamplingType=\"Regular\" SamplingRate=\"%d\" StartTime=\"%d\" EndTime=\"%d\"/>\n",
-                d++, dagPath.partialPathName().asChar(), remapChannel("texture").c_str(), TimePerFrame, StartTime, EndTime);
+        fprintf(f, "    <channel%d ChannelName=\"%s_texture\" ChannelType=\"FloatArray\" ChannelInterpretation=\"texture\" SamplingType=\"Regular\" SamplingRate=\"%d\" StartTime=\"%d\" EndTime=\"%d\"/>\n",
+                d++, dagPath.partialPathName().asChar(), TimePerFrame, StartTime, EndTime);
       }
       
       // Dummy fields (implicit in Field3D format)
@@ -885,6 +945,7 @@ void exportF3d::setF3dField(MFnFluid &fluidFn, const char *outputPath,
     m_hasPressure = false;
     m_hasTexture = false;
     m_hasFalloff = false;
+    m_exportedChannels.clear();
     
     bool hasAnyField = false;
 
@@ -1027,6 +1088,8 @@ void exportF3d::setF3dField(MFnFluid &fluidFn, const char *outputPath,
         Field3DTools::FieldTraits<FField>::SetSparseBlockOrder(densityFld, m_sparseBlockOrder);
         Field3DTools::FieldTraits<FField>::SetSparseBlockDefault(densityFld, sBlockDefault);
       }
+      
+      m_exportedChannels.insert("density");
     }
     
     if (m_hasFuel)
@@ -1041,6 +1104,8 @@ void exportF3d::setF3dField(MFnFluid &fluidFn, const char *outputPath,
         Field3DTools::FieldTraits<FField>::SetSparseBlockOrder(fuelFld, m_sparseBlockOrder);
         Field3DTools::FieldTraits<FField>::SetSparseBlockDefault(fuelFld, sBlockDefault);
       }
+      
+      m_exportedChannels.insert("fuel");
     }
     
     if (m_hasTemperature)
@@ -1055,6 +1120,8 @@ void exportF3d::setF3dField(MFnFluid &fluidFn, const char *outputPath,
         Field3DTools::FieldTraits<FField>::SetSparseBlockOrder(tempFld, m_sparseBlockOrder);
         Field3DTools::FieldTraits<FField>::SetSparseBlockDefault(tempFld, sBlockDefault);
       }
+      
+      m_exportedChannels.insert("temperature");
     }
     
     if (m_hasPressure)
@@ -1069,6 +1136,8 @@ void exportF3d::setF3dField(MFnFluid &fluidFn, const char *outputPath,
         Field3DTools::FieldTraits<FField>::SetSparseBlockOrder(pressureFld, m_sparseBlockOrder);
         Field3DTools::FieldTraits<FField>::SetSparseBlockDefault(pressureFld, sBlockDefault);
       }
+      
+      m_exportedChannels.insert("pressure");
     }
     
     if (m_hasFalloff)
@@ -1083,6 +1152,8 @@ void exportF3d::setF3dField(MFnFluid &fluidFn, const char *outputPath,
         Field3DTools::FieldTraits<FField>::SetSparseBlockOrder(falloffFld, m_sparseBlockOrder);
         Field3DTools::FieldTraits<FField>::SetSparseBlockDefault(falloffFld, sBlockDefault);
       }
+      
+      m_exportedChannels.insert("falloff");
     }
     
     if (m_hasVelocity)
@@ -1092,6 +1163,8 @@ void exportF3d::setF3dField(MFnFluid &fluidFn, const char *outputPath,
       vMac->setMapping(mapping);
       vMac->metadata().setVecFloatMetadata("Offset", Offset);
       vMac->metadata().setVecFloatMetadata("Dimension", Dimension);
+      
+      m_exportedChannels.insert("velocity");
     }
     
     if (m_hasColor)
@@ -1106,6 +1179,8 @@ void exportF3d::setF3dField(MFnFluid &fluidFn, const char *outputPath,
         Field3DTools::FieldTraits<VField>::SetSparseBlockOrder(CdFld, m_sparseBlockOrder);
         Field3DTools::FieldTraits<VField>::SetSparseBlockDefault(CdFld, vBlockDefault);
       }
+      
+      m_exportedChannels.insert("color");
     } 
     
     if (m_hasTexture)
@@ -1120,6 +1195,8 @@ void exportF3d::setF3dField(MFnFluid &fluidFn, const char *outputPath,
         Field3DTools::FieldTraits<VField>::SetSparseBlockOrder(uvwFld, m_sparseBlockOrder);
         Field3DTools::FieldTraits<VField>::SetSparseBlockDefault(uvwFld, vBlockDefault);
       }
+      
+      m_exportedChannels.insert("texture");
     } 
         
     size_t iX, iY, iZ;      
