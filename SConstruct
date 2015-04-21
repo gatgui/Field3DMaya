@@ -52,7 +52,6 @@ targets = [
    "incdirs" : incdirs,
    "libdirs" : libdirs,
    "libs"    : libs,
-   "install" : {"maya%s/scripts" % maya.Version(): glob.glob("scripts/*.mel")},
    "custom"  : [hdf5.Require(hl=False),
                 ilmbase.Require(ilmthread=False, iexmath=False),
                 boost.Require(libs=["system"]),
