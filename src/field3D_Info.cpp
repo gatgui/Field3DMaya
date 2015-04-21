@@ -47,6 +47,8 @@ MObject Field3DInfo::aOutMatrix;
 MObject Field3DInfo::aOutMatrixInverse;
 MObject Field3DInfo::aOutRawMatrix;
 MObject Field3DInfo::aOutRawMatrixInverse;
+MObject Field3DInfo::aOutFluidMatrix;
+MObject Field3DInfo::aOutFluidMatrixInverse;
 
 MObject Field3DInfo::aOutScale;
 MObject Field3DInfo::aOutScaleX;
@@ -147,7 +149,9 @@ MObject Field3DInfo::aOutTranslateZ;
   attributeAffects(attr, aOutMatrix);\
   attributeAffects(attr, aOutMatrixInverse);\
   attributeAffects(attr, aOutRawMatrix);\
-  attributeAffects(attr, aOutRawMatrixInverse);
+  attributeAffects(attr, aOutRawMatrixInverse);\
+  attributeAffects(attr, aOutFluidMatrix);\
+  attributeAffects(attr, aOutFluidMatrixInverse);
 
 
 void* Field3DInfo::creator()
@@ -207,6 +211,7 @@ MStatus Field3DInfo::initialize()
   eattr.addField("fluid", 1);
   eattr.addField("raw_inverse", 2);
   eattr.addField("fluid_inverse", 3);
+  eattr.addField("passthrough", 4);
   stat = addAttribute(aTransformMode); CHECK_ERROR;
   
   aForceDimension = nattr.create("forceDimension", "fdi", MFnNumericData::kBoolean, 0, &stat); CHECK_ERROR;
@@ -285,6 +290,20 @@ MStatus Field3DInfo::initialize()
   tattr.setWritable(false);
   tattr.setHidden(true);
   stat = addAttribute(aOutRawMatrixInverse); CHECK_ERROR;
+  
+  aOutFluidMatrix = tattr.create("outFluidMatrix", "ofmx", MFnData::kMatrix, MObject::kNullObj, &stat); CHECK_ERROR;
+  tattr.setStorable(false);
+  tattr.setReadable(true);
+  tattr.setWritable(false);
+  tattr.setHidden(true);
+  stat = addAttribute(aOutFluidMatrix); CHECK_ERROR;
+  
+  aOutFluidMatrixInverse = tattr.create("outFluidMatrixInverse", "ofmi", MFnData::kMatrix, MObject::kNullObj, &stat); CHECK_ERROR;
+  tattr.setStorable(false);
+  tattr.setReadable(true);
+  tattr.setWritable(false);
+  tattr.setHidden(true);
+  stat = addAttribute(aOutFluidMatrixInverse); CHECK_ERROR;
   
   aOutRotateOrder = eattr.create("outRotateOrder", "oro", 0, &stat); CHECK_ERROR;
   eattr.addField("xyz", 0);
@@ -463,8 +482,10 @@ void Field3DInfo::resetTransform()
   
   mMatrix.setToIdentity();
   mRawMatrix.setToIdentity();
+  mFluidMatrix.setToIdentity();
   mMatrixInverse.setToIdentity();
   mRawMatrixInverse.setToIdentity();
+  mFluidMatrixInverse.setToIdentity();
 }
 
 void Field3DInfo::update(const MString &filename, MTime t,
@@ -664,7 +685,7 @@ void Field3DInfo::update(const MString &filename, MTime t,
         mHasDimension = (d != dv);
         mDimension = (mHasDimension ? MPoint(d.x, d.y, d.z) : MPoint(1, 1, 1));
         
-        // refresh matrix and decompose
+        // get raw matrix
         
         Field3D::MatrixFieldMapping::Ptr mapping = field_dynamic_cast<Field3D::MatrixFieldMapping>(mField->mapping());
         
@@ -679,55 +700,76 @@ void Field3DInfo::update(const MString &filename, MTime t,
         
         mRawMatrixInverse = mRawMatrix.inverse();
         
-        if (transformMode == TM_fluid || transformMode == TM_fluid_inverse)
+        // recompute fluid matrix
+        
+        MMatrix Mmap;
+        MMatrix Mdim;
+        MMatrix Moff;
+        
+        Mmap(3, 0) = -0.5;
+        Mmap(3, 1) = -0.5;
+        Mmap(3, 2) = -0.5;
+        
+        Moff(3, 0) = mOffset.x;
+        Moff(3, 1) = mOffset.y;
+        Moff(3, 2) = mOffset.z;
+        
+        Mdim(0, 0) = mDimension.x;
+        Mdim(1, 1) = mDimension.y;
+        Mdim(2, 2) = mDimension.z;
+        
+        // mMatrix = Mmap * Mdim * Moff * xform
+        // xform = Moffset^1 * Mdim^1 * Mmap^-1 * mMatrix 
+        
+        mFluidMatrix = Moff.inverse() * Mdim.inverse() * Mmap.inverse() * mRawMatrix;
+        
+        if (forceDimension)
         {
-          static double sMapTo01[4][4] = {{  1.0 ,  0.0 ,  0.0 , 0.0 } ,
-                                          {  0.0 ,  1.0 ,  0.0 , 0.0 } ,
-                                          {  0.0 ,  0.0 ,  1.0 , 0.0 } ,
-                                          { -0.5 , -0.5 , -0.5 , 1.0 }};
+          // dimension will be the value connected to fluid node 'dimensions'
           
-          MMatrix mapTo01(sMapTo01);
-          MMatrix Mdim;
-          MMatrix Moff;
+          // apply new scale + offset so that fluid position is globally invariant
           
-          Moff(3, 0) = mOffset.x;
-          Moff(3, 1) = mOffset.y;
-          Moff(3, 2) = mOffset.z;
+          Mdim(0, 0) = (dimension.x > 0.000001 ? mDimension.x / dimension.x : 1);
+          Mdim(1, 1) = (dimension.y > 0.000001 ? mDimension.y / dimension.y : 1);
+          Mdim(2, 2) = (dimension.z > 0.000001 ? mDimension.z / dimension.z : 1);
           
-          Mdim(0, 0) = mDimension.x;
-          Mdim(1, 1) = mDimension.y;
-          Mdim(2, 2) = mDimension.z;
+          Moff(3, 0) = mOffset.x * (1.0 - Mdim(0, 0));
+          Moff(3, 1) = mOffset.y * (1.0 - Mdim(1, 1));
+          Moff(3, 2) = mOffset.z * (1.0 - Mdim(2, 2));
           
-          // mMatrix = mapTo01 * Mdim * Moff * xform
-          // xform = Moffset^1 * Mdim^1 * mapTo01^-1 * mMatrix 
-          
-          mMatrix = Moff.inverse() * Mdim.inverse() * mapTo01.inverse() * mRawMatrix;
-          
-          if (forceDimension)
-          {
-            // dimension will be the value connected to fluid node 'dimensions'
-            
-            // apply new scale + offset so that fluid position is globally invariant
-            
-            Mdim(0, 0) = (dimension.x > 0.000001 ? mDimension.x / dimension.x : 1);
-            Mdim(1, 1) = (dimension.y > 0.000001 ? mDimension.y / dimension.y : 1);
-            Mdim(2, 2) = (dimension.z > 0.000001 ? mDimension.z / dimension.z : 1);
-            
-            Moff(3, 0) = mOffset.x * (1.0 - Mdim(0, 0));
-            Moff(3, 1) = mOffset.y * (1.0 - Mdim(1, 1));
-            Moff(3, 2) = mOffset.z * (1.0 - Mdim(2, 2));
-            
-            mMatrix = Mdim * Moff * mMatrix;
-          }
+          mFluidMatrix = Mdim * Moff * mFluidMatrix;
         }
-        else
+        
+        mFluidMatrixInverse = mFluidMatrix.inverse();
+        
+        // set output matrix and decompose
+        
+        switch (transformMode)
         {
+        case TM_fluid:
+          mMatrix = mFluidMatrix;
+          mMatrixInverse = mFluidMatrixInverse;
+          break;
+        case TM_fluid_inverse:
+          mMatrix = mFluidMatrixInverse;
+          mMatrixInverse = mFluidMatrix;
+          break;
+        case TM_raw_inverse:
+          mMatrix = mRawMatrixInverse;
+          mMatrixInverse = mRawMatrix;
+          break;
+        case TM_passthrough:
+          mMatrix.setToIdentity();
+          mMatrixInverse.setToIdentity();
+          break;
+        case TM_raw:
+        default:
           mMatrix = mRawMatrix;
+          mMatrixInverse = mRawMatrixInverse;
+          break;
         }
         
-        mMatrixInverse = mMatrix.inverse();
-        
-        MTransformationMatrix xform = (transformMode >= TM_raw_inverse ? mMatrixInverse : mMatrix);
+        MTransformationMatrix xform = mMatrix;
         
         mTranslate = xform.getTranslation(MSpace::kTransform);
         xform.getRotation(mRotate, mRotateOrder);
@@ -941,6 +983,16 @@ MStatus Field3DInfo::compute(const MPlug &plug, MDataBlock &data)
   {
     MDataHandle hOut = data.outputValue(aOutRawMatrixInverse);
     hOut.set(mRawMatrixInverse);
+  }
+  else if (oAttr == aOutFluidMatrix)
+  {
+    MDataHandle hOut = data.outputValue(aOutFluidMatrix);
+    hOut.set(mFluidMatrix);
+  }
+  else if (oAttr == aOutFluidMatrixInverse)
+  {
+    MDataHandle hOut = data.outputValue(aOutFluidMatrixInverse);
+    hOut.set(mFluidMatrixInverse);
   }
   // Translation
   else if (oAttr == aOutTranslate)

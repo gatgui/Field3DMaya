@@ -47,6 +47,8 @@ public:
    static MObject aOutOffsetZ;
    static MObject aOutMatrix;
    static MObject aOutMatrixInverse;
+   static MObject aOutFluidMatrix;
+   static MObject aOutFluidMatrixInverse;
    static MObject aOutRawMatrix;
    static MObject aOutRawMatrixInverse;
    
@@ -106,7 +108,8 @@ private:
       TM_raw = 0,
       TM_fluid,
       TM_raw_inverse,
-      TM_fluid_inverse
+      TM_fluid_inverse,
+      TM_passthrough
    };
    
    void reset();
@@ -147,8 +150,10 @@ private:
    MTransformationMatrix::RotationOrder mRotateOrder;
    double mScale[3];
    double mShear[3];
-   MMatrix mMatrix;
-   MMatrix mMatrixInverse;
+   MMatrix mMatrix; // the matrix for current transform mode
+   MMatrix mMatrixInverse; // the inverse matrix for current transform mode
+   MMatrix mFluidMatrix;
+   MMatrix mFluidMatrixInverse;
    MMatrix mRawMatrix;
    MMatrix mRawMatrixInverse;
 };
