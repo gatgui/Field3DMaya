@@ -19,8 +19,6 @@ field3d_static = (excons.GetArgument("field3d-static", 0, int) != 0)
 
 if not excons.GetArgument("with-field3d", default=None):
   # Build Field3D
-  excons.SetArgument("static", "1" if field3d_static else "0")
-  
   SConscript("Field3D/SConstruct")
   
   prefix = os.path.abspath("./Field3D/%s/%s" % (excons.mode_dir, excons.arch_dir))
@@ -41,6 +39,9 @@ libs.append("Field3D")
 if field3d_static:
   defs.append("FIELD3D_STATIC")
 
+if sys.platform == "win32":
+  defs.append("NO_TTY")
+
 # Maya plugin
 targets = [
   {"name"    : "maya%s/plug-ins/f3dTools" % maya.Version(),
@@ -54,7 +55,7 @@ targets = [
    "libs"    : libs,
    "custom"  : [hdf5.Require(hl=False),
                 ilmbase.Require(ilmthread=False, iexmath=False),
-                boost.Require(libs=["system"]),
+                boost.Require(libs=["system", "regex"]),
                 maya.Require, maya.Plugin]}
 ]
 

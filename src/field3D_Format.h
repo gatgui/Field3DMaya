@@ -34,8 +34,6 @@
 #define FIELD3D_MAYA_CACHE_FORMAT
 
 // This is added to prevent multiple definitions of the MApiVersion string.
-#define _MApiVersion
-
 #include <maya/MIOStream.h>
 #include <maya/MPxNode.h>
 #include <maya/MFnNumericAttribute.h>
@@ -47,7 +45,6 @@
 #include <maya/MVector.h>
 #include <maya/MDataBlock.h>
 #include <maya/MDataHandle.h>
-#include <maya/MFnPlugin.h>
 #include <maya/MGlobal.h>
 #include <maya/MString.h>
 #include <maya/MPxCacheFormat.h>

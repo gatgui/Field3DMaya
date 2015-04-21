@@ -59,8 +59,8 @@
 #include <maya/MCommonSystemUtils.h>
 #include <maya/MTime.h>
 
-#include <sys/wait.h>
-#include <ctype.h>
+//#include <sys/wait.h>
+//#include <ctype.h>
 #include <string>
 #include <list>
 #include <vector>

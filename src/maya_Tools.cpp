@@ -42,6 +42,7 @@
 #include <maya/MDagPath.h>
 #include <maya/MItDag.h>
 #include <maya/MFnDagNode.h>
+#include <iostream>
 
 using namespace std;
 
