@@ -7,21 +7,15 @@ global proc string createVRayF3dGrid(string $filename)
     }
     
     string $grid = `createNode -ss -name "VRayVolumeGridShape#" VRayVolumeGrid`;
-    string $f3dinfo = `createNode -ss Field3DInfo`;
-    
     setAttr -type "string" ($grid+".inFile") $filename;
+    sets -e -forceElement initialShadingGroup $grid;
+    
+    string $f3dinfo = `createNode -ss Field3DInfo`;
+    setAttr -l 1 ($f3dinfo+".transformMode") 1;
+    setAttr -l 1 ($f3dinfo+".forceDimension") 0;
     
     string $pl[] = `listRelatives -parent $grid`;
-    
-    connectAttr ($grid+".inFile") ($f3dinfo+".filename");
-    connectAttr time1.outTime ($f3dinfo+".time");
-    
-    string $muldiv = `createNode -ss multiplyDivide`;
-    connectAttr ($f3dinfo+".outResolution") ($muldiv+".input1");
-    setAttr -l 1 ($muldiv+".input2") 0.5 0.5 0.5;
-    
-    connectAttr ($muldiv+".output") ($pl[0]+".translate");
-    setAttr -l 1 ($pl[0]+".rotate") -90.0 0.0 0.0;
+    setAttr -l 1 ($pl[0]+".rotate") 90.0 0.0 0.0;
     setAttr -l 1 ($pl[0]+".scale");
     setAttr -l 1 ($pl[0]+".shear");
     setAttr -l 1 ($pl[0]+".rotateOrder");
@@ -30,6 +24,27 @@ global proc string createVRayF3dGrid(string $filename)
     setAttr -l 1 ($pl[0]+".rotatePivotTranslate");
     setAttr -l 1 ($pl[0]+".scalePivot");
     setAttr -l 1 ($pl[0]+".scalePivotTranslate");
+    
+    connectAttr ($grid+".inFile") ($f3dinfo+".filename");
+    connectAttr time1.outTime ($f3dinfo+".time");
+    
+    string $muldiv0 = `createNode -ss multiplyDivide`;
+    connectAttr ($f3dinfo+".outResolution") ($muldiv0+".input1");
+    setAttr -l 1 ($muldiv0+".input2") -0.5 -0.5 -0.5;
+    
+    string $muldiv1 = `createNode -ss multiplyDivide`;
+    connectAttr ($f3dinfo+".outScale") ($muldiv1+".input1");
+    connectAttr ($f3dinfo+".outDimension") ($muldiv1+".input2");
+    
+    string $muldiv2 = `createNode -ss multiplyDivide`;
+    connectAttr ($f3dinfo+".outTranslate") ($muldiv2+".input1");
+    connectAttr ($muldiv1+".output") ($muldiv2+".input2");
+    
+    string $plusmin0 = `createNode -ss plusMinusAverage`;
+    connectAttr ($muldiv0+".output") ($plusmin0+".input3D[0]");
+    connectAttr ($muldiv2+".output") ($plusmin0+".input3D[1]");
+    
+    connectAttr ($plusmin0+".output3D") ($pl[0]+".translate");
     
     select -r $grid;
     
