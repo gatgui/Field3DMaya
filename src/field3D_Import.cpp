@@ -321,7 +321,7 @@ MStatus importF3d::doIt(const MArgList &argList)
         }
       }
       
-      MString shapeName = (ns + ":" + partition).c_str();
+      MString shapeName = (ns.length() > 0 ? (ns + ":" + partition).c_str() : partition.c_str());
       
       if (!xmlOnly)
       {
@@ -572,6 +572,12 @@ MStatus importF3d::doIt(const MArgList &argList)
         
         nInfo.findPlug("filename").setString(pat.c_str());
         nInfo.findPlug("transformMode").setShort(1);
+        nInfo.findPlug("partition").setString(partition.c_str());
+        channelIt = channels.begin();
+        if (channelIt != channels.end())
+        {
+          nInfo.findPlug("field").setString(channelIt->second.name.c_str());
+        }
         
         dgmod.connect(nTime.findPlug("outTime"), nInfo.findPlug("time"));
         dgmod.connect(nInfo.findPlug("outTranslate"), fluidTr.findPlug("translate"));
