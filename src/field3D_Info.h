@@ -51,6 +51,14 @@ public:
    static MObject aOutFluidMatrixInverse;
    static MObject aOutRawMatrix;
    static MObject aOutRawMatrixInverse;
+   static MObject aOutBoxMin;
+   static MObject aOutBoxMinX;
+   static MObject aOutBoxMinY;
+   static MObject aOutBoxMinZ;
+   static MObject aOutBoxMax;
+   static MObject aOutBoxMaxX;
+   static MObject aOutBoxMaxY;
+   static MObject aOutBoxMaxZ;
    
    // same as matrix but decomposed
    static MObject aOutScale;
@@ -113,6 +121,7 @@ private:
    };
    
    void reset();
+   void resetBox();
    void resetOffset();
    void resetDimension();
    void resetResolution();
@@ -156,6 +165,8 @@ private:
    MMatrix mFluidMatrixInverse;
    MMatrix mRawMatrix;
    MMatrix mRawMatrixInverse;
+   MPoint mBoxMin;
+   MPoint mBoxMax;
 };
 
 #endif

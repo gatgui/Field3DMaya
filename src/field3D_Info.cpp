@@ -49,6 +49,14 @@ MObject Field3DInfo::aOutRawMatrix;
 MObject Field3DInfo::aOutRawMatrixInverse;
 MObject Field3DInfo::aOutFluidMatrix;
 MObject Field3DInfo::aOutFluidMatrixInverse;
+MObject Field3DInfo::aOutBoxMin;
+MObject Field3DInfo::aOutBoxMinX;
+MObject Field3DInfo::aOutBoxMinY;
+MObject Field3DInfo::aOutBoxMinZ;
+MObject Field3DInfo::aOutBoxMax;
+MObject Field3DInfo::aOutBoxMaxX;
+MObject Field3DInfo::aOutBoxMaxY;
+MObject Field3DInfo::aOutBoxMaxZ;
 
 MObject Field3DInfo::aOutScale;
 MObject Field3DInfo::aOutScaleX;
@@ -349,6 +357,9 @@ MStatus Field3DInfo::initialize()
   ADD_XYZ_OUTPUT_ATTR(aOutRotateAxis, "outRotateAxis", "ora", zero);
   ADD_XYZ_OUTPUT_ATTR(aOutTranslate, "outTranslate", "ot", zero);
   
+  ADD_XYZ_OUTPUT_ATTR(aOutBoxMin, "outBoxMin", "obmin", zero);
+  ADD_XYZ_OUTPUT_ATTR(aOutBoxMax, "outBoxMax", "obmax", zero);
+  
   // ---
   
   attributeAffects(aFilename, aOutPartitions);
@@ -384,6 +395,16 @@ MStatus Field3DInfo::initialize()
   attributeAffects(aTime, aOutOffset);
   attributeAffects(aPartition, aOutOffset);
   attributeAffects(aField, aOutOffset);
+  
+  attributeAffects(aFilename, aOutBoxMin);
+  attributeAffects(aTime, aOutBoxMin);
+  attributeAffects(aPartition, aOutBoxMin);
+  attributeAffects(aField, aOutBoxMin);
+  
+  attributeAffects(aFilename, aOutBoxMax);
+  attributeAffects(aTime, aOutBoxMax);
+  attributeAffects(aPartition, aOutBoxMax);
+  attributeAffects(aField, aOutBoxMax);
   
   AFFECTS_TRANSFORM_OUTPUTS(aFilename);
   AFFECTS_TRANSFORM_OUTPUTS(aTime);
@@ -422,6 +443,7 @@ Field3DInfo::~Field3DInfo()
 
 void Field3DInfo::reset()
 {
+  resetBox();
   resetTransform();
   resetOffset();
   resetDimension();
@@ -441,6 +463,17 @@ void Field3DInfo::resetFile()
     delete mFile;
     mFile = 0;
   }
+}
+
+void Field3DInfo::resetBox()
+{
+  mBoxMin.x = 0.0;
+  mBoxMin.y = 0.0;
+  mBoxMin.z = 0.0;
+  
+  mBoxMax.x = 0.0;
+  mBoxMax.y = 0.0;
+  mBoxMax.z = 0.0;
 }
 
 void Field3DInfo::resetOffset()
@@ -672,6 +705,82 @@ void Field3DInfo::update(const MString &filename, MTime t,
         Field3D::V3f o = mField->metadata().vecFloatMetadata("Offset", dv);
         mHasOffset = (o != dv);
         mOffset = (mHasOffset ? MPoint(o.x, o.y, o.z) : MPoint(0, 0, 0));
+        
+        // refresh box
+        Field3D::Box3d wBox;
+        Field3D::V3d wCorner;
+        Field3D::V3d lCorners[8];
+          
+        lCorners[0] = Field3D::V3d(0, 0, 0);
+        lCorners[1] = Field3D::V3d(0, 0, 1);
+        lCorners[2] = Field3D::V3d(0, 1, 0);
+        lCorners[3] = Field3D::V3d(0, 1, 1);
+        lCorners[4] = Field3D::V3d(1, 0, 0);
+        lCorners[5] = Field3D::V3d(1, 0, 1);
+        lCorners[6] = Field3D::V3d(1, 1, 0);
+        lCorners[7] = Field3D::V3d(1, 1, 1);
+        
+        resetBox();
+        
+        if (partition.length() > 0 && field.length() > 0)
+        {
+          for (size_t c=0; c<8; ++c)
+          {
+            mField->mapping()->localToWorld(lCorners[c], wCorner);
+            wBox.extendBy(wCorner);
+          }
+        }
+        else
+        {
+          std::vector<std::string> fieldNames;
+          Field3D::EmptyField<float>::Vec fields;
+          bool readFieldNames = (field.length() == 0);
+          
+          if (!readFieldNames)
+          {
+            fieldNames.push_back(field.asChar());
+          }
+          
+          for (size_t i=0; i<mPartitions.size(); ++i)
+          {
+            if (readFieldNames)
+            {
+              fieldNames.clear();
+              Field3DTools::getFieldNames(mFile, mPartitions[i], fieldNames);
+            }
+            
+            for (size_t j=0; j<fieldNames.size(); ++j)
+            {
+              fields = mFile->readProxyLayer<float>(mPartitions[i], fieldNames[j], false);
+              if (fields.empty())
+              {
+                fields = mFile->readProxyLayer<float>(mPartitions[i], fieldNames[j], true);
+              }
+              
+              if (!fields.empty())
+              {
+                for (size_t k=0; k<fields.size(); ++k)
+                {
+                  for (size_t c=0; c<8; ++c)
+                  {
+                    fields[k]->mapping()->localToWorld(lCorners[c], wCorner);
+                    wBox.extendBy(wCorner);
+                  }
+                }
+              }
+            }
+          }
+        }
+        
+        if (!wBox.isEmpty())
+        {
+          mBoxMin.x = wBox.min.x;
+          mBoxMin.y = wBox.min.y;
+          mBoxMin.z = wBox.min.z;
+          mBoxMax.x = wBox.max.x;
+          mBoxMax.y = wBox.max.y;
+          mBoxMax.z = wBox.max.z;
+        }
       }
       
       if (forceUpdate ||
@@ -786,6 +895,7 @@ void Field3DInfo::update(const MString &filename, MTime t,
     else
     {
       // only reset output that depends on mField
+      resetBox();
       resetOffset();
       resetDimension();
       resetResolution();
@@ -1082,6 +1192,48 @@ MStatus Field3DInfo::compute(const MPlug &plug, MDataBlock &data)
   {
     MDataHandle hOut = data.outputValue(oAttr);
     hOut.set(mShear[2]);
+  }
+  // Box min
+  else if (oAttr == aOutBoxMin)
+  {
+    MDataHandle hOut = data.outputValue(oAttr);
+    hOut.set(mBoxMin.x, mBoxMin.y, mBoxMin.z);
+  }
+  else if (oAttr == aOutBoxMinX)
+  {
+    MDataHandle hOut = data.outputValue(oAttr);
+    hOut.set(mBoxMin.x);
+  }
+  else if (oAttr == aOutBoxMinY)
+  {
+    MDataHandle hOut = data.outputValue(oAttr);
+    hOut.set(mBoxMin.y);
+  }
+  else if (oAttr == aOutBoxMinZ)
+  {
+    MDataHandle hOut = data.outputValue(oAttr);
+    hOut.set(mBoxMin.z);
+  }
+  // Box max
+  else if (oAttr == aOutBoxMax)
+  {
+    MDataHandle hOut = data.outputValue(oAttr);
+    hOut.set(mBoxMax.x, mBoxMax.y, mBoxMax.z);
+  }
+  else if (oAttr == aOutBoxMaxX)
+  {
+    MDataHandle hOut = data.outputValue(oAttr);
+    hOut.set(mBoxMax.x);
+  }
+  else if (oAttr == aOutBoxMaxY)
+  {
+    MDataHandle hOut = data.outputValue(oAttr);
+    hOut.set(mBoxMax.y);
+  }
+  else if (oAttr == aOutBoxMaxZ)
+  {
+    MDataHandle hOut = data.outputValue(oAttr);
+    hOut.set(mBoxMax.z);
   }
   // Other
   else if (oAttr == aOutRotateAxis ||
