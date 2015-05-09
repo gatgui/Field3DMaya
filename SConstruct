@@ -19,12 +19,11 @@ field3d_static = (excons.GetArgument("field3d-static", 0, int) != 0)
 
 field3d_inc, field3d_lib = excons.GetDirs("field3d")
 if not field3d_inc and not field3d_lib:
-  # Build Field3D
-  SConscript("Field3D/SConstruct")
+  # Build Field3D as a static lib
+  field3d_static = True
+  excons.SetArgument("field3d-static", 1)
   
-  prefix = os.path.abspath("./Field3D/%s/%s" % (excons.mode_dir, excons.arch_dir))
-  field3d_inc = "%s/include" % prefix
-  field3d_lib = "%s/lib" % prefix
+  SConscript("Field3D/SConstruct")
 
 if field3d_inc:
   incdirs.append(field3d_inc)
